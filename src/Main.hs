@@ -43,7 +43,9 @@ data Thingy = Thingy
     , _flags :: Map Flag String
     } deriving (Show, Read, Eq)
 
-data Flag = Done deriving (Show, Read, Eq, Ord)
+data Flag = Done
+          | Wait
+          deriving (Show, Read, Eq, Ord)
 
 -- | Edges
 type Relation = String
@@ -156,6 +158,7 @@ defaultRenderer = Renderer
 
     , renderFlag = \case
         Done -> P.dullgreen "done"
+        Wait -> P.dullyellow "waiting"
     }
 
 data DocFx = DocFx P.Doc [DocFx]
@@ -196,7 +199,8 @@ commands = Node
     , Node (command "node" "Add, modify and delete nodes" nodeAction)
         [ Node (command "child" "Create a new child with parent set to current context" addThingyAction) []
         , Node (command "new" "Create a new node with the specified edge" createAction) [] 
-        , Node (command "done" "Set the task done" doneAction) []
+        , Node (command "done" "Set the task done" $ flagAction Done) []
+        , Node (command "wait" "Set to waiting state" $ flagAction Wait) []
         , Node (command "set" "Update the content" updateAction) []
         ]
     , Node (command "quit" "Quit the application" $ io $ liftIO exitSuccess) []
@@ -225,9 +229,9 @@ setContextAction = withNonOption (Arg.optional (-1) nodeType) $ \node -> io $ do
                 | otherwise  = nodeNotFound
     ifExists node onError onSuccess
 
-doneAction :: Action Handler
-doneAction = withNonOption nodeType $ \node -> io $ do
-    setFlagGr node Done ""
+flagAction :: Flag -> Action Handler
+flagAction flag = withNonOption nodeType $ \node -> io $ do
+    setFlagGr node flag ""
     saveDB
 
 updateAction :: Action Handler
