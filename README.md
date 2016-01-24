@@ -11,3 +11,4 @@
     node from a tracking node
 - Sorting by relevance
 - Default connect new childs to some node that is used to track incoming things
+- Find function

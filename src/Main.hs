@@ -64,6 +64,7 @@ makeLenses ''DB
 
 data Filter = FFlag Flag
             | FNotFlag Flag
+            | FNotContent String
             | FNone
 
 -- | Sorting stuff.
@@ -104,6 +105,7 @@ applyFilters fltrs (_, (_,_,thingy,_)) = all applyFilter fltrs
     applyFilter FNone = True
     applyFilter (FNotFlag flg) = Map.notMember flg (_flags thingy)
     applyFilter (FFlag flg) = Map.member flg (_flags thingy)
+    applyFilter (FNotContent str) = _content thingy /= str
 
 flagSortDefault :: Flag -> Sort
 flagSortDefault Wait = SDesc (SFlag Wait)
@@ -357,8 +359,10 @@ lsAction = foldingOpts filters $ \fltr -> foldingOpts sorts $ \srt -> io $ do
     printChildren fltr srt node
 
 todoAction :: Action Handler
-todoAction = foldingOpts filters $ \fltr -> foldingOpts sorts $ \srt -> io $ do
-    printChildrenFlat fltr (sortFirstRel "child" : srt) 0
+todoAction = foldingOpts filters $ \flt_opt -> foldingOpts sorts $ \srt_opt -> io $ do
+    let flt = FNotContent "someday/maybe" : flt_opt
+        srt = sortFirstRel "child" : srt_opt
+    printChildrenFlat flt srt 0
 
 setContextAction :: Action Handler
 setContextAction = withNonOption (Arg.optional (-1) nodeType) $ \node -> io $ do
