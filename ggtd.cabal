@@ -12,19 +12,47 @@ category:            Application
 build-type:          Simple
 cabal-version:       >=1.10
 
-executable ggtd
+library
   hs-source-dirs:      src
-  main-is:             Main.hs
+  exposed-modules:     GGTD.Base
+                     , GGTD.Filter
+                     , GGTD.Sort
+                     , GGTD.DB
+                     , GGTD.DB.Query
+                     , GGTD.DB.Update
+                     , GGTD.CLI
+                     , GGTD.CLI.Render
+                     , GGTD.CLI.Ls
+                     , GGTD.CLI.Todo
+                     , GGTD.CLI.Set
+                     , GGTD.CLI.Node
+                     , GGTD.CLI.Edge
+                     , GGTD.CLI.Option
   default-language:    Haskell2010
-  build-depends:       base >= 4.7 && < 5
-                     , time >= 1.0 && < 2
-                     , containers >= 0.5 && < 1
-                     , transformers >= 0.4 && < 0.5
-                     , fgl  >= 5.0 && < 6
-                     , lens >= 4.0 && < 5.0
-                     , directory >= 1.0 && < 2
-                     , console-program >= 0.4 && < 1
-                     , ansi-wl-pprint >= 0.6 && < 1
-                     , regex-base >= 0.90 && < 1
-                     , regex-compat >= 0.90 && < 1
-  ghc-options: -Wall -Werror -O
+  build-depends:       base            >= 4.7  && < 5
+                     , time            >= 1.0  && < 2
+                     , containers      >= 0.5  && < 1
+                     , transformers    >= 0.4  && < 0.5
+                     , fgl             >= 5.0  && < 6
+                     , lens            >= 4.0  && < 5.0
+                     , directory       >= 1.0  && < 2
+                     , console-program >= 0.4  && < 1
+                     , ansi-wl-pprint  >= 0.6  && < 1
+                     , regex-base      >= 0.90 && < 1
+                     , regex-compat    >= 0.90 && < 1
+  ghc-options:         -Wall -Werror -O
+  default-extensions:  OverloadedStrings
+                       RecordWildCards
+                       TemplateHaskell
+                       MultiWayIf
+                       LambdaCase
+
+executable ggtd
+  hs-source-dirs:      app
+  main-is:             main.hs
+  default-language:    Haskell2010
+  build-depends:       ggtd
+                     , base >= 4.7 && < 5
+                     , transformers
+                     , console-program
+  ghc-options:         -Wall -Werror -O
