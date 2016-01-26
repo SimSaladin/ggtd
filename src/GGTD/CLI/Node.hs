@@ -19,6 +19,7 @@ import           GGTD.Relation
 
 import           Control.Lens hiding ((&), Context, Context')
 import           Control.Monad.IO.Class
+import           Data.Graph.Inductive.Graph
 import           System.Console.Command
 import qualified System.Console.Argument as Arg
 
@@ -80,3 +81,17 @@ inAction =
             node <- addThingyGr thingy
             addRelGr (parent, node, relChild)
             printNode node
+
+-- | Show the context of a node.
+--
+-- Arguments: [NODE]
+nodeShowAction :: Action IO
+nodeShowAction =
+    withNonOption nodeType $ \nodeP ->
+    handler $ fromNodeP nodeP >>= \case
+        Nothing -> return ()
+        Just node -> do
+            (mctx, _) <- use gr <&> match node
+            case mctx of
+                Just ctx -> pp (render ctx)
+                Nothing -> nodeNotFound

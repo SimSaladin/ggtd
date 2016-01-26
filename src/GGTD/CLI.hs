@@ -29,7 +29,7 @@ commands = Node
     [
       Node (command "ls" "List thingies. By default lists all not-done tasks starting at current view context." lsAction) []
     , Node (command "in" "Add a new thingy into the \"in\" node" inAction) []
-    , Node (command "todo" "Print a flat list of items, a TODO list" todoAction) []
+    , Node (command "action" "Print a flat list of actionable items" todoAction) []
     , Node (command "done" "Set the task done" $ nodeFlagAction Done) []
     , Node (command "wait" "Set to waiting state" $ nodeFlagAction Wait) []
     , Node (command "context" "Set the active context to the given node" setContextAction) []
@@ -39,7 +39,8 @@ commands = Node
            \with the given description under the current view context."
            nodeCreateAction)
         [
-          Node (command "update" "Update the content" nodeUpdateAction) []
+          Node (command "show" "Show node context" nodeShowAction) [] 
+        , Node (command "update" "Update the content" nodeUpdateAction) []
         , Node (command "priority" "Set node priority" $ nodePriorityAction) []
         ]
     , Node (command "rel" "Add, modify or delete edges" edgeCreateAction)
