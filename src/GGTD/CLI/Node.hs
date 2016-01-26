@@ -12,50 +12,71 @@ module GGTD.CLI.Node where
 import           GGTD.Base
 import           GGTD.CLI.Option
 import           GGTD.CLI.Render
-import           GGTD.DB (saveDB)
+import           GGTD.CLI.Base
 import           GGTD.DB.Update
+import           GGTD.DB.Query
+import           GGTD.Relation
 
 import           Control.Lens hiding ((&), Context, Context')
+import           Control.Monad.IO.Class
 import           System.Console.Command
 import qualified System.Console.Argument as Arg
 
--- | The default action is to create a node with the given content.
-nodeAction :: Action Handler
-nodeAction = withNonOption contentType $ \cnt -> io $ do
-    thingy <- createThingy cnt
-    node <- addThingyGr thingy
-    parent <- use viewContext
-    addRelGr (parent, node, "child")
-    saveDB
-    printChildren [] [] =<< use viewContext
-
-nodeCreateAction :: Action Handler
+-- | Arguments: -p[PARENT] -r[RELATION] [CONTENT]
+nodeCreateAction :: Action IO
 nodeCreateAction =
-    withOption parentOpt $ \nd ->
-    withNonOption relType $ \rel ->
+    withOption parentOpt $ \parentP ->
+    withOption relOpt $ \rel ->
     withNonOption contentType $ \cnt ->
-    io $ do
-        thingy <- createThingy cnt
-        node <- addThingyGr thingy
-        parent <- if nd >= 0 then return nd else use viewContext
-        addRelGr (parent, node, rel)
-        printNode node
-        saveDB
+    handler $ fromNodeP parentP >>= \case
+        Nothing -> return ()
+        Just parent' -> do
+            parent <- if parent' >= 0 then return parent' else use viewContext
+            thingy <- createThingy cnt
+            node <- addThingyGr thingy
+            addRelGr (parent, node, rel)
+            printNode node
 
-nodeUpdateAction :: Action Handler
-nodeUpdateAction = withNonOption nodeType $ \node -> withNonOption Arg.string $ \cnt -> io $ do
-    updateContentGr node cnt
-    saveDB
+-- | Arguments: [NODE] [CONTENT]
+nodeUpdateAction :: Action IO
+nodeUpdateAction =
+    withNonOption nodeType $ \nodeP ->
+    withNonOption Arg.string $ \cnt ->
+    handler $ fromNodeP nodeP >>= \case
+        Nothing -> return ()
+        Just node -> do
+            updateContentGr node cnt
 
-nodeFlagAction :: Flag -> Action Handler
-nodeFlagAction flag = withNonOption nodeType $ \node -> io $ do
-    setFlagGr node flag ""
-    saveDB
+-- | Sets the flag
+--
+-- Arguments: [-d] [NODE]
+nodeFlagAction :: Flag -> Action IO
+nodeFlagAction flag =
+    withNonOption nodeType $ \nodeP ->
+    withOption deleteOpt $ \del ->
+    withOption contentOpt $ \cnt ->
+    handler $ fromNodeP nodeP >>= \case
+        Nothing -> return ()
+        Just node -> alterFlagGr node flag $
+            if del then Nothing else Just cnt
 
-nodePriorityAction :: Action Handler
-nodePriorityAction = withNonOption nodeType $ \node ->
+-- | Arguments: [NODE] [PRIORITY]
+nodePriorityAction :: Action IO
+nodePriorityAction =
+    withNonOption nodeType $ \nodeP ->
     withNonOption Arg.integer $ \int ->
-    io $ do
-        setFlagGr node Priority (show int)
-        saveDB
+    handler $ fromNodeP nodeP >>= \case
+        Nothing -> return ()
+        Just node -> alterFlagGr node Priority (Just (show int))
 
+-- | Arguments: [CONTENT]
+inAction :: Action IO
+inAction =
+    withNonOption contentType $ \cnt ->
+    handler $ getRootChildByLabel "in" >>= \case
+        Nothing -> liftIO $ putStrLn "The in-node was not found as a parent of root (0). (You may need to create it first)"
+        Just parent -> do
+            thingy <- createThingy cnt
+            node <- addThingyGr thingy
+            addRelGr (parent, node, relChild)
+            printNode node

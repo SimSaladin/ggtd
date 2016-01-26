@@ -9,42 +9,51 @@
 ------------------------------------------------------------------------------
 module GGTD.CLI where
 
-import           GGTD.Base
-import           GGTD.CLI.Ls
-import           GGTD.CLI.Todo
-import           GGTD.CLI.Set
-import           GGTD.CLI.Node
-import           GGTD.CLI.Edge
+import GGTD.Base
+import GGTD.CLI.Edge
+import GGTD.CLI.Ls
+import GGTD.CLI.Node
+import GGTD.CLI.Set
+import GGTD.CLI.Tickler
+import GGTD.CLI.Todo
 
-import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Class
-import           Data.Tree
-import           System.Console.Command
-import           System.Console.Program (showUsage)
-import           System.Exit (exitSuccess)
+import Data.Tree
+import System.Console.Command
+import System.Console.Program (showUsage)
+import System.Exit (exitSuccess)
 
 -- | Default commands
-commands :: Commands Handler
+commands :: Commands IO
 commands = Node
-    (command "ggtd" "A graphy getting-things-done application" . io $ lift $ putStrLn "No command given; try \"ggtd help\".")
+    (command "ggtd" "A graphy getting-things-done application" . io $ putStrLn "No command given; try \"ggtd help\".")
     [
       Node (command "ls" "List thingies. By default lists all not-done tasks starting at current view context." lsAction) []
+    , Node (command "in" "Add a new thingy into the \"in\" node" inAction) []
     , Node (command "todo" "Print a flat list of items, a TODO list" todoAction) []
+    , Node (command "done" "Set the task done" $ nodeFlagAction Done) []
+    , Node (command "wait" "Set to waiting state" $ nodeFlagAction Wait) []
     , Node (command "context" "Set the active context to the given node" setContextAction) []
-    , Node (command "node" "Add, modify and delete nodes. node \"Some node description\" creates a node with the given description under the current view context." nodeAction)
+    , Node (command "node"
+           "Add, modify and delete nodes.\n\
+           \node \"Some node description\" creates a node\n\
+           \with the given description under the current view context."
+           nodeCreateAction)
         [
-          Node (command "create" "Create a new node with the specified edge" nodeCreateAction) [] 
-        , Node (command "update" "Update the content" nodeUpdateAction) []
-        , Node (command "done" "Set the task done" $ nodeFlagAction Done) []
-        , Node (command "wait" "Set to waiting state" $ nodeFlagAction Wait) []
+          Node (command "update" "Update the content" nodeUpdateAction) []
         , Node (command "priority" "Set node priority" $ nodePriorityAction) []
         ]
-    , Node (command "edge" "Add, modify or delete edges" edgeAction)
+    , Node (command "rel" "Add, modify or delete edges" edgeCreateAction)
         [ 
-          Node (command "relation" "Change the relation type" edgeChangeAction) []
+          Node (command "update" "Change the relation type" edgeChangeAction) []
         , Node (command "parent" "Change the parent of a node" edgeParentAction) []
         ]
-    , Node (command "quit" "Quit the application" $ io $ liftIO exitSuccess) []
+    , Node (command "tickler" "Manage ticklers" ticklerAction)
+        [
+          Node (command "add" "Attach a tickler to a node" ticklerAddAction) []
+        , Node (command "rm" "Remove tickler(s) from a node" ticklerRmAction) []
+        -- , Node (command "ls" "List all active ticklers") []
+        ]
+    , Node (command "quit" "Quit the application" $ io $ exitSuccess) []
     , Node (command "help" "Show help" $ io $ showUsage commands) []
     ]
 

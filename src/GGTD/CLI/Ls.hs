@@ -12,6 +12,7 @@ module GGTD.CLI.Ls where
 import           GGTD.Base
 import           GGTD.CLI.Option
 import           GGTD.CLI.Render
+import           GGTD.CLI.Base
 import           GGTD.Filter
 import           GGTD.Sort
 
@@ -19,7 +20,13 @@ import           Control.Lens hiding ((&), Context, Context')
 import           System.Console.Command
 
 -- | Tree
-lsAction :: Action Handler
-lsAction = foldingOpts filters $ \fltr -> foldingOpts sorts $ \srt -> io $ do
-    node <- use viewContext
-    printChildren fltr srt node
+lsAction :: Action IO
+lsAction =
+    withNonOption (nodeOptType (-1)) $ \nodeP ->
+    foldingOpts filters $ \fltr ->
+    foldingOpts sorts $ \srt ->
+    handler $ fromNodeP nodeP >>= \case
+        Nothing -> return ()
+        Just node -> do
+            node' <- if node == -1 then use viewContext else return node
+            printChildren fltr srt node'

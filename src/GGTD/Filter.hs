@@ -31,7 +31,8 @@ filters = do
         parse "no"  = Right (FNotFlag flg)
         parse "yes" = Right (FFlag flg)
         parse ""    = Right (FFlag flg)
-        parse x     = Left $ "Expected yes, no or nothing but got: \"" ++ x ++ "\" instead."
+        parse "any" = Right FNone
+        parse x     = Left $ "Expected yes, no, any or \"\" but got: \"" ++ x ++ "\" instead."
 
         short = toLower $ head (show flg)
         long  = map toLower $ show flg

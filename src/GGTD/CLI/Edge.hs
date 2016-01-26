@@ -9,27 +9,46 @@
 ------------------------------------------------------------------------------
 module GGTD.CLI.Edge where
 
-import           GGTD.Base
-import           GGTD.CLI.Option
-import           GGTD.CLI.Render
-import           GGTD.DB (saveDB)
-import           GGTD.DB.Update
+import GGTD.Base
+import GGTD.CLI.Base
+import GGTD.CLI.Option
+import GGTD.CLI.Render
+import GGTD.DB.Update
 
-import           Control.Monad.Trans.Class
-import           System.Console.Command
+import Control.Lens
+import Control.Applicative
+import System.Console.Command
 
-edgeAction :: Action Handler
-edgeAction = io $ do
-    lift $ putStrLn "Not yet implemented"
+-- |
+-- Arguments: [FROM] [TO] [RELATION]
+edgeChangeAction :: Action IO
+edgeChangeAction =
+    withNonOption nodeType $ \nodeP ->
+    withNonOption nodeType $ \node'P ->
+    withNonOption relType $ \rel ->
+    handler $ fromNodeP nodeP >>= \nodePM -> fromNodeP node'P >>= \node'PM -> case liftA2 (,) nodePM node'PM of
+        Nothing -> return ()
+        Just (node, node') ->
+            overNode node $ sucadj.each.filtered ((== node') . snd) .adjlab .~ rel
 
-edgeChangeAction :: Action Handler
-edgeChangeAction = withNonOption nodeType $ \node -> withNonOption relType $ \rel -> io $ do
-    setRelGr node rel
-    printNode node
-    saveDB
+edgeParentAction :: Action IO
+edgeParentAction =
+    withNonOption nodeType $ \nodeP ->
+    withNonOption nodeType $ \newParentP ->
+    handler $ fromNodeP nodeP >>= \nodePM -> fromNodeP newParentP >>= \parentPM -> case liftA2 (,) nodePM parentPM of
+        Nothing -> return ()
+        Just (node, newParent) -> do
+            setParentGr node newParent
+            printNode node
 
-edgeParentAction :: Action Handler
-edgeParentAction = withNonOption nodeType $ \node -> withNonOption nodeType $ \newParent -> io $ do
-    setParentGr node newParent
-    printNode node
-    saveDB
+-- | Create a new edge
+--
+-- Arguments: -r[REL] [FROM] [TO] 
+edgeCreateAction :: Action IO
+edgeCreateAction =
+    withOption relOpt $ \rel ->
+    withNonOption nodeType $ \fromP ->
+    withNonOption nodeType $ \toP ->
+    handler $ fromNodeP fromP >>= \fromPM -> fromNodeP toP >>= \toPM -> case liftA2 (,) fromPM toPM of
+        Nothing -> return ()
+        Just (fromN, toN) -> addRelGr (fromN, toN, rel)

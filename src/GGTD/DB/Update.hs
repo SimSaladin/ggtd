@@ -33,15 +33,12 @@ addThingyGr thingy = do
 addRelGr :: (Node, Node, Relation) -> Handler ()
 addRelGr edge = gr %= insEdge edge
 
-setFlagGr :: Node -> Flag -> String -> Handler ()
-setFlagGr n f v = overNode n (_3.flags %~ Map.insert f v)
+alterFlagGr :: Node -> Flag -> Maybe String -> Handler ()
+alterFlagGr node flag val = overNode node $
+    _3.flags %~ Map.alter (const val) flag
 
 updateContentGr :: Node -> String -> Handler ()
 updateContentGr node cnt = overNode node (_3.content .~ cnt)
-
--- | Set all relations to the node to be of the given type.
-setRelGr :: Node -> Relation -> Handler ()
-setRelGr node rel = overNode node (_1.each._1 .~ rel)
 
 setParentGr :: Node -> Node -> Handler ()
 setParentGr node parent = overNode node (_1.each._2 .~ parent)

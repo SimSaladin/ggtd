@@ -1,12 +1,12 @@
 module Main where
 
 import GGTD.CLI (commands)
-import GGTD.DB (loadDB)
-import Control.Monad (void)
-import Control.Monad.Trans.State.Strict (runStateT)
+import GGTD.Tickler (forkTicklerWorker)
+import GGTD.DB (loadDB, setDB)
 import System.Console.Program (interactive)
 
 main :: IO ()
 main = do
-    db <- loadDB
-    void $ runStateT (interactive commands) db
+    loadDB >>= setDB
+    _ <- forkTicklerWorker
+    interactive commands
