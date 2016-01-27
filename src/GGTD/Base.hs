@@ -1,3 +1,7 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 ------------------------------------------------------------------------------
 -- |
 -- Module         : GGTD.Base
@@ -20,6 +24,9 @@ import           Data.Graph.Inductive.Query.DFS (CFun)
 import           Data.Graph.Inductive.PatriciaTree
 import           Data.Time
 import           Data.Map (Map)
+import qualified Data.Map as Map
+import           GHC.Generics (Generic)
+import           Data.Yaml (ToJSON(..), FromJSON(..))
 
 -- | Use Handlers to make modificationss to the DB.
 type Handler = StateT DB IO
@@ -30,7 +37,7 @@ data DB = DB
         , _rootNode    :: Node -- ^ Parent of everything
         , _viewContext :: Node -- ^ Active context root
         , _ticklerLast :: Day  -- ^ Last tickler run
-        } deriving (Show, Read)
+        } deriving (Show, Read, Generic)
 
 type Gr' = Gr Thingy Relation
 
@@ -41,13 +48,13 @@ data Thingy = Thingy
     { _created :: UTCTime
     , _content :: String
     , _flags :: Map Flag String
-    } deriving (Show, Read, Eq)
+    } deriving (Show, Read, Eq, Generic)
 
 data Flag = Done
           | Wait
           | Priority
           | Ticklers
-          deriving (Show, Read, Eq, Ord, Enum, Bounded)
+          deriving (Show, Read, Eq, Ord, Enum, Bounded, Generic)
 
 -- | Edges
 type Relation = String
@@ -98,3 +105,25 @@ ifExists node failure success = do
 
 nodeNotFound :: Handler ()
 nodeNotFound = liftIO $ putStrLn "Node not found"
+
+------------------------------------
+-- Instances
+
+instance ToJSON DB
+instance FromJSON DB
+
+instance ToJSON Gr'
+instance FromJSON Gr'
+
+instance ToJSON Flag
+instance FromJSON Flag 
+
+instance ToJSON Thingy
+instance FromJSON Thingy
+
+instance ToJSON (Map Flag String) where
+    toJSON = toJSON . Map.mapKeys show
+instance FromJSON (Map Flag String) where
+    parseJSON = fmap (Map.mapKeys read) . parseJSON
+instance ToJSON Day where toJSON = toJSON . fromEnum
+instance FromJSON Day where parseJSON = fmap toEnum . parseJSON

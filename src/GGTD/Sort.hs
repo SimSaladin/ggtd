@@ -36,7 +36,7 @@ defaultSort =
     [ sortLastRel relLink
     , SDesc (SFlag Wait)
     , SFlag Priority
-    , SDesc SCreated
+    , SCreated
     ]
 
 sortOpt :: Arg.Option Sort

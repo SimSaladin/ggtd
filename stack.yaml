@@ -13,6 +13,7 @@ extra-deps:
    - parsec-extra-0.1.0.5 # dep of ^
    - utility-ht-0.0.11 # dep of ^
    - friendly-time-0.4
+   - directory-1.2.5.0 # newer than lts-3.16
 
 # Override default flag values for local packages and extra-deps
 flags: {}

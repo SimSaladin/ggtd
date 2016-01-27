@@ -20,6 +20,13 @@ import           Data.Tree
 import           Data.Tuple (swap)
 import           Data.Graph.Inductive.Graph
 
+-- * Single
+
+getContext :: Node -> Handler (Maybe Context')
+getContext n = use gr <&> fst . match n
+
+-- * Tree-like
+
 type View = Tree (Relation, Context') -- ^ The context, and via which path we reached it
 
 getViewAtGr :: [Filter] -> Sort -> Node -> Handler ([View], Gr')
@@ -40,6 +47,8 @@ getRootChildByLabel str = use gr <&> go
     go :: Gr' -> Maybe Node
     go g = let f n = maybe False ((== str) . _content) $ lab g n
                in fst (match 0 g) >>= L.find f . pre'
+
+-- * Flat
 
 -- | Find by exact submatch.
 findNodes :: String -> Handler [LNode Thingy]

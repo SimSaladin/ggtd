@@ -34,6 +34,7 @@ commands = Node
     , Node (command "done" "Set the task done" $ nodeFlagAction Done) []
     , Node (command "wait" "Set to waiting state" $ nodeFlagAction Wait) []
     , Node (command "context" "Set the active context to the given node" setContextAction) []
+    , Node (command "up" "Up one parent" setUpAction) []
     , Node (command "node"
            "Add, modify and delete nodes.\n\
            \node \"Some node description\" creates a node\n\

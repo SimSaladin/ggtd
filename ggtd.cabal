@@ -33,19 +33,21 @@ library
                      , GGTD.Sort
                      , GGTD.Tickler
   default-language:    Haskell2010
-  build-depends:       base            >= 4.7  && < 5
-                     , time            >= 1.0  && < 2
-                     , containers      >= 0.5  && < 1
-                     , transformers    >= 0.4  && < 0.5
-                     , stm             >= 2.4  && < 3
-                     , fgl             >= 5.0  && < 6
-                     , lens            >= 4.0  && < 5.0
-                     , directory       >= 1.0  && < 2
-                     , console-program >= 0.4  && < 1
-                     , ansi-wl-pprint  >= 0.6  && < 1
-                     , regex-base      >= 0.90 && < 1
-                     , regex-compat    >= 0.90 && < 1
-                     , friendly-time   >= 0.4  && < 1
+  build-depends:       base            >= 4.7     && < 5
+                     , time            >= 1.0     && < 2
+                     , containers      >= 0.5     && < 1
+                     , transformers    >= 0.4     && < 0.5
+                     , stm             >= 2.4     && < 3
+                     , fgl             >= 5.0     && < 6
+                     , lens            >= 4.0     && < 5.0
+                     , directory       >= 1.2.3   && < 2
+                     , filepath        >= 1.0     && < 2
+                     , console-program >= 0.4     && < 1
+                     , ansi-wl-pprint  >= 0.6     && < 1
+                     , regex-base      >= 0.90    && < 1
+                     , regex-compat    >= 0.90    && < 1
+                     , friendly-time   >= 0.4     && < 1
+                     , yaml            >= 0.8.4   && < 1
   ghc-options:         -Wall -Werror -O
   default-extensions:  OverloadedStrings
                        RecordWildCards
