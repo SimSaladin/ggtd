@@ -17,6 +17,7 @@ import GGTD.DB.Update
 
 import Control.Lens
 import Control.Applicative
+import Data.Graph.Inductive.Graph
 import System.Console.Command
 
 -- |
@@ -28,8 +29,8 @@ edgeChangeAction =
     withNonOption relType $ \rel ->
     handler $ fromNodeP nodeP >>= \nodePM -> fromNodeP node'P >>= \node'PM -> case liftA2 (,) nodePM node'PM of
         Nothing -> return ()
-        Just (node, node') ->
-            overNode node $ sucadj.each.filtered ((== node') . snd) .adjlab .~ rel
+        Just (nd, nd') ->
+            overNode nd $ sucadj.each.filtered ((== nd') . snd) .adjlab .~ rel
 
 edgeParentAction :: Action IO
 edgeParentAction =
@@ -52,3 +53,14 @@ edgeCreateAction =
     handler $ fromNodeP fromP >>= \fromPM -> fromNodeP toP >>= \toPM -> case liftA2 (,) fromPM toPM of
         Nothing -> return ()
         Just (fromN, toN) -> addRelGr (fromN, toN, rel)
+
+-- | Remove all edges from the given node to another.
+--
+-- Arguments: [FROM] [TO] 
+edgeDeleteAction :: Action IO
+edgeDeleteAction =
+    withNonOption nodeType $ \fromP ->
+    withNonOption nodeType $ \toP ->
+    handler $ fromNodeP fromP >>= \fromPM -> fromNodeP toP >>= \toPM -> case liftA2 (,) fromPM toPM of
+        Nothing -> return ()
+        Just (fromN, toN) -> gr %= delEdge (fromN, toN)

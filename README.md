@@ -1,5 +1,39 @@
 # ggtd
 
+
+## Installation
+
+     git clone ...
+     cd ggtd
+     stack build
+     stack exec ggtd
+
+## Usage
+
+New task
+
+    node "Do the laundry"
+
+New aggregated context (link)
+
+    node -rlink "@home"
+
+Add stuff to an aggregated context
+
+    rel laundry @home
+
+(in the above example, laundry and @home are resolved automatically to correct
+nodes.)
+
+Add a group of items into an aggregated context as a group:
+just set the correct rel.
+
+    rel -rgroup chores @home
+
+Remove all relation from a node to a node:
+
+    rel delete @home chores
+
 ## Nice-to-have-things
 
 - Integration possibilities with things like github issues

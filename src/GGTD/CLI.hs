@@ -47,6 +47,7 @@ commands = Node
         [ 
           Node (command "update" "Change the relation type" edgeChangeAction) []
         , Node (command "parent" "Change the parent of a node" edgeParentAction) []
+        , Node (command "delete" "Remove a relation" edgeDeleteAction) []
         ]
     , Node (command "tickler" "Manage ticklers" ticklerAction)
         [
