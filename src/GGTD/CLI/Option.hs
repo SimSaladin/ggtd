@@ -15,6 +15,7 @@ import           GGTD.Relation
 import           GGTD.Tickler
 
 import           Text.Read (readMaybe)
+import           Control.Lens
 import           Control.Monad.IO.Class
 import           Data.Graph.Inductive.Graph
 import qualified Data.List as L
@@ -93,10 +94,26 @@ fromNodeP p = case readMaybe p of
     Just node -> return (Just node)
     Nothing -> findNodes p >>= \case
         [(n,_)] -> return (Just n)
-        []  -> liftIO $ putStrLn "No such node" >> return Nothing
-        xs  -> do liftIO $ putStrLn "Multiple nodes found, please narrow down:"
-                  liftIO $ mapM_ print xs
-                  return Nothing
+        []      -> liftIO $ putStrLn "No such node" >> return Nothing
+        xs      -> reasonablyUnique p xs >>= \case
+            Just (n,_) -> return (Just n)
+            Nothing    -> do
+                liftIO $ putStrLn "Multiple nodes found, please narrow down:"
+                liftIO $ mapM_ print xs
+                return Nothing
+
+-- | A node of a list of nodes is reasonably unique, if one of the
+-- following holds
+--  
+--  * The argument is the only exact text match
+--  * There is only one result as a direct successor of our current context
+reasonablyUnique :: NodeP -> [(Node, Thingy)] -> Handler (Maybe (Node, Thingy))
+reasonablyUnique p xs = do
+    here <- use viewContext
+    successors <- use gr <&> flip suc here
+    if | [res] <- filter ( (== p) . _content . snd ) xs -> return (Just res)
+       | [res] <- filter ( (`elem` successors) . fst ) xs -> return (Just res)
+       | otherwise -> return Nothing
 
 toNodeP :: Node -> NodeP
 toNodeP = show
