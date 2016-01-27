@@ -12,6 +12,7 @@ extra-deps:
    - console-program-0.4.0.3
    - parsec-extra-0.1.0.5 # dep of ^
    - utility-ht-0.0.11 # dep of ^
+   - friendly-time-0.4
 
 # Override default flag values for local packages and extra-deps
 flags: {}

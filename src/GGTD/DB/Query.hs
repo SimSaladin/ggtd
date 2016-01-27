@@ -22,7 +22,7 @@ import           Data.Graph.Inductive.Graph
 
 type View = Tree (Relation, Context') -- ^ The context, and via which path we reached it
 
-getViewAtGr :: [Filter] -> [Sort] -> Node -> Handler ([View], Gr')
+getViewAtGr :: [Filter] -> Sort -> Node -> Handler ([View], Gr')
 getViewAtGr fltr srt node = do
     g <- use gr
     let recurse :: Relation -> Context' -> [(Node, Relation)]
@@ -30,7 +30,7 @@ getViewAtGr fltr srt node = do
             | rel == relLink = [] -- Don't recurse into link-node's ancestors.
             | otherwise = map swap
             . over (each._2) node'
-            . applySorts srt . filter (applyFilters fltr)
+            . applySort srt . filter (applyFilters fltr)
             $ over (each._2) (context g) xs
     xdfWith' recurse (,) [(node, "")] <$> use gr
 

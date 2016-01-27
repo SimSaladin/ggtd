@@ -24,7 +24,7 @@ lsAction :: Action IO
 lsAction =
     withNonOption (nodeOptType (-1)) $ \nodeP ->
     foldingOpts filters $ \fltr ->
-    foldingOpts sorts $ \srt ->
+    withOption sortOpt $ \srt ->
     handler $ fromNodeP nodeP >>= \case
         Nothing -> return ()
         Just node -> do

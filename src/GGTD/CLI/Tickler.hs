@@ -14,13 +14,16 @@ import GGTD.CLI.Base
 import GGTD.CLI.Render
 import GGTD.CLI.Option
 
+import Control.Monad.IO.Class (liftIO)
+import Data.Time (getCurrentTime)
 import System.Console.Command
 
 -- | List all active ticklers and status of tickler worker
 ticklerAction :: Action IO
 ticklerAction =
-    handler $ listTicklers >>= mapM_
-        (\((n,th), ta) -> pp $ renderNodeTicklers n th ta)
+    handler $ do
+        now <- liftIO getCurrentTime
+        listTicklers >>= mapM_ (\((n,th), ta) -> pp $ renderNodeTicklers now n th ta)
 
 -- | Add a tickler to a node
 --

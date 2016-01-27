@@ -25,7 +25,7 @@ import System.Console.Command
 todoAction :: Action IO
 todoAction =
     foldingOpts filters $ \flt_opt ->
-    foldingOpts sorts $ \srt_opt ->
+    withOption sortOpt $ \srt_opt ->
     withNonOption (nodeOptType (-1)) $ \nodeP ->
     handler $ fromNodeP nodeP >>= \case
         Nothing -> return ()

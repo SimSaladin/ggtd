@@ -10,66 +10,60 @@
 module GGTD.Sort where
 
 import           GGTD.Base
+import           GGTD.Relation
 
-import           Data.Function (on)
-import           Data.Char
-import           Data.Ord (comparing, Down(..))
-import           Data.List (sortBy)
+import           Data.Function                  ( on )
+import           Data.Ord                       ( comparing, Down(..) )
+import qualified Data.List                      as L
 import           Data.Graph.Inductive.Graph
-import qualified Data.Map as Map
-import           System.Console.Argument (option)
-import qualified System.Console.Argument as Arg
+import qualified Data.Map                       as Map
+import           Control.Applicative            ( liftA2 )
+import           System.Console.Argument        ( option )
+import qualified System.Console.Argument        as Arg
 
--- | Sorting stuff.
-data Sort = SFlag Flag
-          | SCreated
-          | SRelation (Relation -> Relation -> Ordering)
-          | SDesc Sort
-          | SNone
+data SortAtom =
+     SFlag Flag
+   | SCreated
+   | SRelation (Relation -> Relation -> Ordering)
+   | SDesc SortAtom
 
-flagSortDefault :: Flag -> Sort
-flagSortDefault Wait = SDesc (SFlag Wait)
-flagSortDefault Priority = SFlag Priority
-flagSortDefault _ = SNone
+-- | The sort atoms are performed sequentially, and the head of the list
+-- always takes precedence.
+type Sort = [SortAtom]
 
--- | Note that the order is important: sorts deciding at the head of the
--- list always takes precedence.
-sorts :: [Arg.Option Sort]
-sorts = flagSorts ++ [createdSort]
+defaultSort :: Sort
+defaultSort =
+    [ sortLastRel relLink
+    , SDesc (SFlag Wait)
+    , SFlag Priority
+    , SDesc SCreated
+    ]
+
+sortOpt :: Arg.Option Sort
+sortOpt = option "s" ["sort"] sortType defaultSort "Sort the results"
   where
-    createdSort =
-        let parse :: String -> Either String Sort
-            parse "desc" = Right $ SDesc SCreated
-            parse "asc"  = Right SCreated
-            parse ""     = Right SCreated
-            parse x      = Left $ "Expected desc, asc or nothing but got: \"" ++ x ++ "\" instead."
+    sortType = Arg.Type parse "[SORT]" (Just defaultSort)
 
-            in option "c" ["created"] (Arg.Type parse "ASC" Nothing) (SDesc SCreated) "Sort by creation date"
+    parse :: String -> Either String Sort
+    parse []  = return []
+    parse str = go $ L.span (== ',') str
 
-    flagSorts = do
-        flg <- [minBound..maxBound]
+    go (opt, str) = liftA2 (:) (parseOpt opt) (parse str)
 
-        let parse :: String -> Either String Sort
-            parse "desc" = Right (SDesc $ SFlag flg)
-            parse "asc"  = Right (SFlag flg)
-            parse ""     = Right (SDesc $ SFlag flg)
-            parse x      = Left $ "Expected desc, asc or nothing but got: \"" ++ x ++ "\" instead."
+    parseOpt ('-':x)   = SDesc <$> parseOpt x
+    parseOpt "created" = pure SCreated
+    parseOpt "done"    = pure (SFlag Done)
+    parseOpt "wait"    = pure (SFlag Wait)
+    parseOpt str       = fail $ "Unknown sort predicate " ++ str
 
-            short = head (show flg)
-            long  = "sort-by-" ++ map toLower (show flg)
-            typ   = Arg.Type parse "ASC" Nothing
-            desc  = "Sort by flag \"" ++ show flg ++ "\""
-
-        return $ option [short] [long] typ (flagSortDefault flg) desc
-
-applySorts :: [Sort] -> [(Relation, Context')] -> [(Relation, Context')]
-applySorts srt = sortBy (buildSortOrd srt)
+applySort :: Sort -> [(Relation, Context')] -> [(Relation, Context')]
+applySort srt = L.sortBy (buildSortOrd srt)
   where
-    buildSortOrd :: [Sort] -> (Relation, Context') -> (Relation, Context') -> Ordering
+    buildSortOrd :: Sort -> (Relation, Context') -> (Relation, Context') -> Ordering
     buildSortOrd []     = \_ _ -> EQ
     buildSortOrd (x:xs) = sortFunc x `combining` buildSortOrd xs
         
-    sortFunc :: Sort -> (Relation, Context') -> (Relation, Context') -> Ordering
+    sortFunc :: SortAtom -> (Relation, Context') -> (Relation, Context') -> Ordering
     sortFunc x = case x of
         SFlag flag   -> comparing $ Down . viewFlag flag
         SCreated     -> comparing $ _created . lab' . snd
@@ -78,7 +72,6 @@ applySorts srt = sortBy (buildSortOrd srt)
                                     LT -> GT
                                     GT -> LT
                                     EQ -> EQ
-        SNone        -> \_ _ -> EQ
 
     viewFlag flag (_, ctx) = Map.lookup flag . _flags $ lab' ctx
 
@@ -87,9 +80,9 @@ applySorts srt = sortBy (buildSortOrd srt)
                             (EQ, r) -> r
                             (r, _)  -> r
 
-sortFirstRel :: Relation -> Sort
+sortFirstRel, sortLastRel :: Relation -> SortAtom
 sortFirstRel rel = SRelation $ \a b -> if | a == rel && b == rel -> EQ
                                           | a == rel             -> LT
                                           | b == rel             -> GT
                                           | otherwise            -> EQ
-
+sortLastRel = SDesc . sortFirstRel

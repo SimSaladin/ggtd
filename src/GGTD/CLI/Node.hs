@@ -18,7 +18,8 @@ import           GGTD.DB.Query
 import           GGTD.Relation
 
 import           Control.Lens hiding ((&), Context, Context')
-import           Control.Monad.IO.Class
+import           Control.Monad.IO.Class (liftIO)
+import           Data.Time (getCurrentTime)
 import           Data.Graph.Inductive.Graph
 import           System.Console.Command
 import qualified System.Console.Argument as Arg
@@ -93,5 +94,5 @@ nodeShowAction =
         Just node -> do
             (mctx, _) <- use gr <&> match node
             case mctx of
-                Just ctx -> pp (render ctx)
+                Just ctx -> liftIO getCurrentTime >>= \now -> pp (render (now, ctx))
                 Nothing -> nodeNotFound
