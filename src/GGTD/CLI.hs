@@ -30,6 +30,7 @@ commands = Node
       Node (command "ls" "List thingies. By default lists all not-done tasks starting at current view context." lsAction) []
     , Node (command "in" "Add a new thingy into the \"in\" node" inAction) []
     , Node (command "action" "Print a flat list of actionable items" todoAction) []
+    , Node (command "grep" "Grep contents of all items" nodeGrepAction) []
     , Node (command "done" "Set the task done" $ nodeFlagAction Done) []
     , Node (command "wait" "Set to waiting state" $ nodeFlagAction Wait) []
     , Node (command "context" "Set the active context to the given node" setContextAction) []

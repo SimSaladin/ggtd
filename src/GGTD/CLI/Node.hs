@@ -96,3 +96,12 @@ nodeShowAction =
             case mctx of
                 Just ctx -> liftIO getCurrentTime >>= \now -> pp (render (now, ctx))
                 Nothing -> nodeNotFound
+
+-- | Grep nodes
+--
+-- Arguments: [QUERY]
+nodeGrepAction :: Action IO
+nodeGrepAction =
+    withNonOption contentType $ \qstr ->
+    handler $ do now <- liftIO getCurrentTime
+                 findNodes qstr >>= pp . renderNodesFlat now

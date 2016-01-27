@@ -90,6 +90,9 @@ renderThingyLineFlat now node Thingy{..} =
         P.<+> (if Map.null _flags then P.empty else P.tupled $ map render $ Map.keys _flags)
         P.<+> render (now, _created)
 
+renderNodesFlat :: UTCTime -> [(Node, Thingy)] -> P.Doc
+renderNodesFlat now = P.vcat . map (uncurry $ renderThingyLineFlat now)
+
 renderViewRoot :: UTCTime -> Tree (Relation, Context') -> P.Doc
 renderViewRoot now (Node (_, ctx) sub) =
   P.hang 2 $ P.dullblue (renderThingyLine now (node' ctx) (lab' ctx))
