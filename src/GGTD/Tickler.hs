@@ -37,7 +37,7 @@ type DayOfWeek = Int
 data Tickler = TDayOfWeek DayOfWeek -- ^ Every given day of week
              | TMonth Month -- ^ Beginning of the month
              | TYear Year -- ^ Beginning of a year
-             | TDay Day
+             | TDay Day -- ^ A specific day
              deriving (Show, Read, Eq)
 
 -- | What actions a tickler may do.

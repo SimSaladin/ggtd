@@ -9,13 +9,15 @@
 ------------------------------------------------------------------------------
 module GGTD.CLI.Tickler where
 
+import GGTD.Base
 import GGTD.Tickler
+import GGTD.DB.Update
 import GGTD.CLI.Base
 import GGTD.CLI.Render
 import GGTD.CLI.Option
 
+import Data.Time
 import Control.Monad.IO.Class (liftIO)
-import Data.Time (getCurrentTime)
 import System.Console.Command
 
 -- | List all active ticklers and status of tickler worker
@@ -53,3 +55,17 @@ ticklerRmAction =
     handler $ fromNodeP nodeP >>= \case
         Nothing -> return ()
         Just node -> removeTicklers node
+
+-- | Defer a given node to a later date.
+--
+-- Arguments: -p[DAYS] [NODE]
+ticklerDeferAction :: Action IO
+ticklerDeferAction =
+    withOption daysOpt $ \days ->
+    withNonOption nodeType $ \nodeP ->
+    handler $ fromNodeP nodeP >>= \case
+        Nothing -> return ()
+        Just node -> do
+            now <- localDay . zonedTimeToLocalTime <$> liftIO getZonedTime
+            alterFlagGr node Wait (Just "deferred")
+            attachTickler (TDay $ addDays days now) (TSetFlag Wait Nothing) node

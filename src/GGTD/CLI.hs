@@ -31,6 +31,7 @@ commands = Node
     , Node (command "in" "Add a new thingy into the \"in\" node" inAction) []
     , Node (command "action" "Print a flat list of actionable items" todoAction) []
     , Node (command "grep" "Grep contents of all items" nodeGrepAction) []
+    , Node (command "defer" "Defer the node to a later day" ticklerDeferAction) []
     , Node (command "done" "Set the task done" $ nodeFlagAction Done) []
     , Node (command "wait" "Set to waiting state" $ nodeFlagAction Wait) []
     , Node (command "context" "Set the active context to the given node" setContextAction) []

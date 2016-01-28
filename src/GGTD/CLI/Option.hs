@@ -53,6 +53,10 @@ deleteOpt :: Option Bool
 deleteOpt = option "d" ["delete"] Arg.boolean
     False "Delete instead of adding"
 
+daysOpt :: Option Integer
+daysOpt = option "n" ["days"] Arg.integer
+    1 "Number of days"
+
 -- ** Types
 
 nodeType :: Arg.Type NodeP
