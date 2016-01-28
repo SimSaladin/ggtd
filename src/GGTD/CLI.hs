@@ -45,6 +45,7 @@ commands = Node
           Node (command "show" "Show node context" nodeShowAction) [] 
         , Node (command "update" "Update the content" nodeUpdateAction) []
         , Node (command "priority" "Set node priority" $ nodePriorityAction) []
+        , Node (command "delete" "Delete a childless node" nodeDeleteAction) []
         ]
     , Node (command "rel" "Add, modify or delete edges" edgeCreateAction)
         [ 

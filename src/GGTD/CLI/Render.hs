@@ -28,6 +28,7 @@ import qualified Text.PrettyPrint.ANSI.Leijen as P
 import qualified Text.Regex as Regex
 import qualified Text.Regex.Base as Regex
 import           Data.Time.Format.Human (humanReadableTime')
+import           System.IO (stdout)
 
 -- * New class-interface
 
@@ -169,7 +170,7 @@ printNode node = do
 
 -- | Adds a newline to the end.
 pp :: P.Doc -> Handler ()
-pp = liftIO . P.putDoc . (P.<$$> P.empty)
+pp = liftIO . P.displayIO stdout . P.renderPretty 0.4 300 . (P.<$$> P.empty)
 
 -- | Only @relChild@'s are actionable
 isActionable :: (Relation, Context') -> Bool

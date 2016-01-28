@@ -105,3 +105,17 @@ nodeGrepAction =
     withNonOption contentType $ \qstr ->
     handler $ do now <- liftIO getCurrentTime
                  findNodes qstr >>= pp . renderNodesFlat now
+
+-- | Delete a node.
+-- Does not allow deleting nodes that have successors.
+--
+-- Arguments: [NODE]
+nodeDeleteAction :: Action IO
+nodeDeleteAction =
+    withNonOption nodeType $ \nodeP ->
+    handler $ fromNodeP nodeP >>= \case
+        Nothing -> return ()
+        Just node -> getContext node >>= \case
+            Nothing -> nodeNotFound
+            Just ctx | null (suc' ctx) -> deleteNodeGr node
+                     | otherwise       -> liftIO $ putStrLn "Won't delete node because it has children"

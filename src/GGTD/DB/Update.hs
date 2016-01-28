@@ -50,4 +50,5 @@ overNode node f = use gr >>= go
     go g | (Just ctx, g') <- match node g = gr .= (f ctx & g')
          | otherwise                      = nodeNotFound
 
-
+deleteNodeGr :: Node -> Handler ()
+deleteNodeGr node = gr %= delNode node
