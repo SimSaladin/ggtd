@@ -13,7 +13,6 @@ import           GGTD.Base
 import           GGTD.CLI.Option
 import           GGTD.CLI.Render
 import           GGTD.CLI.Base
-import           GGTD.Filter
 import           GGTD.Sort
 
 import           Control.Lens hiding ((&), Context, Context')

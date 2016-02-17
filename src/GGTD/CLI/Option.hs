@@ -10,6 +10,7 @@
 module GGTD.CLI.Option where
 
 import           GGTD.Base
+import           GGTD.Filter
 import           GGTD.DB.Query
 import           GGTD.Relation
 import           GGTD.Tickler
@@ -57,6 +58,20 @@ deleteOpt = option "d" ["delete"] Arg.boolean
 daysOpt :: Option Integer
 daysOpt = option "n" ["days"] Arg.integer
     1 "Number of days"
+
+-- ** Filters
+
+-- | Filter out nodes with given relation in.
+--
+-- By default filters out references.
+relationFilterOption :: Arg.Option Filter
+relationFilterOption = option "r" ["rel"] (fmap FNotRel relType) { defaultValue = Just FNone }
+    (FNotRel relRef)
+    "Filter out nodes with given relation in"
+
+-- | Default filters
+filters :: [Arg.Option Filter]
+filters = flagFilterOptions ++ [relationFilterOption]
 
 -- ** Types
 
