@@ -58,28 +58,34 @@ sortOpt = option "s" ["sort"] sortType defaultSort "Sort the results"
     parseOpt str       = fail $ "Unknown sort predicate " ++ str
 
 applySort :: Sort -> [(Relation, Context')] -> [(Relation, Context')]
-applySort srt = L.sortBy (buildSortOrd srt)
+applySort = applySort' id
+
+applySort' :: (a -> (Relation, Context')) -> Sort -> [a] -> [a]
+applySort' f srt = L.sortBy (\a b -> buildSortOrd srt (f a) (f b))
   where
-    buildSortOrd :: Sort -> (Relation, Context') -> (Relation, Context') -> Ordering
+    -- buildSortOrd :: Sort -> a -> a -> Ordering
     buildSortOrd []     = \_ _ -> EQ
     buildSortOrd (x:xs) = sortFunc x `combining` buildSortOrd xs
-        
-    sortFunc :: SortAtom -> (Relation, Context') -> (Relation, Context') -> Ordering
-    sortFunc x = case x of
-        SFlag flag   -> comparing $ Down . viewFlag flag
-        SCreated     -> comparing $ _created . lab' . snd
-        SRelation f  -> f `on` fst
-        SDesc s      -> \a b -> case sortFunc s a b of
-                                    LT -> GT
-                                    GT -> LT
-                                    EQ -> EQ
 
-    viewFlag flag (_, ctx) = Map.lookup flag . _flags $ lab' ctx
+sortFunc :: SortAtom -> (Relation, Context') -> (Relation, Context') -> Ordering
+sortFunc x = case x of
+    SFlag flag   -> comparing $ Down . viewFlag flag
+    SCreated     -> comparing $ _created . lab' . snd
+    SRelation f  -> f `on` fst
+    SDesc s      -> \a b -> case sortFunc s a b of
+                                LT -> GT
+                                GT -> LT
+                                EQ -> EQ
 
-    combining :: (a -> a -> Ordering) -> (a -> a -> Ordering) -> a -> a -> Ordering
-    combining f g x y = case (f x y, g x y) of
-                            (EQ, r) -> r
-                            (r, _)  -> r
+viewFlag :: Flag -> (Relation, Context') -> Maybe String
+viewFlag flag (_, ctx) = Map.lookup flag . _flags $ lab' ctx
+
+-- | Combine two compare functions @f, g@ so that @g@ is evaluated only if
+-- @f@ evaluates to @EQ@, in which case we return $g$.
+combining :: (a -> a -> Ordering) -> (a -> a -> Ordering) -> a -> a -> Ordering
+combining f g x y = case (f x y, g x y) of
+                        (EQ, r) -> r
+                        (r, _)  -> r
 
 sortFirstRel, sortLastRel :: Relation -> SortAtom
 sortFirstRel rel = SRelation $ \a b -> if | a == rel && b == rel -> EQ

@@ -71,7 +71,7 @@ instance Renderable (UTCTime, UTCTime) where
 
 renderNodeTicklers :: UTCTime -> Node -> Thingy -> [(Tickler, TicklerAction)] -> P.Doc
 renderNodeTicklers now n th ta =
-    P.hang 2 (renderThingyLineFlat now n th P.<$$> P.vsep (map render ta))
+    P.hang 2 (renderThingyLineFlat now Nothing n th P.<$$> P.vsep (map render ta))
         P.<$$> P.empty
 
 -- | A generic single-line view of a thingy.
@@ -83,17 +83,23 @@ renderThingyLine now node Thingy{..} =
         P.<+> (if Map.null _flags then id else (P.tupled (map render $ Map.keys _flags) P.<+>))
             (render (now, _created))
 
--- | Like @renderThingyLine@, but for a flat rendering
-renderThingyLineFlat :: UTCTime -> Node -> Thingy -> P.Doc
-renderThingyLineFlat now node Thingy{..} =
+-- | Like @renderThingyLine@, but for a flat rendering.
+renderThingyLineFlat
+    :: UTCTime
+    -> Maybe String -- ^ Some extra stuff to be shown in brackets
+    -> Node
+    -> Thingy
+    -> P.Doc
+renderThingyLineFlat now mextra node Thingy{..} =
     let color = if Map.member Wait _flags then P.green else id
     in renderNode node
         P.<+> color (renderContent _content)
+        P.<+> (maybe P.empty (P.yellow . P.brackets . P.dullyellow . P.text) mextra)
         P.<+> (if Map.null _flags then P.empty else P.tupled $ map render $ Map.keys _flags)
         P.<+> render (now, _created)
 
 renderNodesFlat :: UTCTime -> [(Node, Thingy)] -> P.Doc
-renderNodesFlat now = P.vcat . map (uncurry $ renderThingyLineFlat now)
+renderNodesFlat now = P.vcat . map (uncurry $ renderThingyLineFlat now Nothing)
 
 renderViewRoot :: UTCTime -> Tree (Relation, Context') -> P.Doc
 renderViewRoot now (Node (_, ctx) sub) =
@@ -161,12 +167,12 @@ printChildrenFlat
     -> Node
     -> Handler ()
 printChildrenFlat fltr srt srt' node = do
-    now <- liftIO getCurrentTime
     (forest, _) <- getViewAtGr fltr srt node
+    let flat     = concatMap flatten $ map (tagging "root" (_content . lab')) forest
+        thingies = applySort' fst srt' $ filter (isActionable . fst) flat
 
-    let flat = concatMap flatten forest
-        thingies = applySort srt' $ filter isActionable flat
-        totext (_, ctx) = renderThingyLineFlat now (node' ctx) (lab' ctx)
+    now <- liftIO getCurrentTime
+    let totext ((_, ctx), parent) = renderThingyLineFlat now (Just parent) (node' ctx) (lab' ctx)
 
     pp $ P.vcat $ map totext thingies
 

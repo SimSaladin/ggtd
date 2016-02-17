@@ -29,6 +29,8 @@ getContext n = use gr <&> fst . match n
 
 type View = Tree (Relation, Context') -- ^ The context, and via which path we reached it
 
+type TaggedView tag = Tree ((Relation, Context'), tag)
+
 getViewAtGr :: [Filter] -> Sort -> Node -> Handler ([View], Gr')
 getViewAtGr fltr srt node = do
     g <- use gr
@@ -47,6 +49,14 @@ getRootChildByLabel str = use gr <&> go
     go :: Gr' -> Maybe Node
     go g = let f n = maybe False ((== str) . _content) $ lab g n
                in fst (match 0 g) >>= L.find f . pre'
+
+-- | Tag every context in a view with a function dependent on the node's
+-- parent.
+tagging :: tag -> (Context' -> tag) -> View -> TaggedView tag
+tagging rootTag tag = go Nothing
+  where
+    go s (Node n@(_, c) forest) =
+        Node (n, maybe rootTag tag s) (map (go $ Just c) forest)
 
 -- * Flat
 
