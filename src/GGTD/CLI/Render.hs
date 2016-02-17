@@ -57,11 +57,12 @@ instance Renderable Flag where
 instance Renderable (Tickler, TicklerAction) where
     render (t,ta) = render t P.<> ":" P.<+> render ta
 
+-- | Caveat: doesn't detect incoming relation.
 instance Renderable (UTCTime, Context') where
     render (now, (ap, node, thingy, as)) =
         P.vsep (map renderPre ap)
         P.<$$>
-        "  " P.<> renderThingyLine now node thingy
+        "  " P.<> renderThingyLine now "" node thingy
         P.<$$>
         P.hang 5 ("     " P.<> P.vsep (map renderSuc as))
 
@@ -75,12 +76,23 @@ renderNodeTicklers now n th ta =
         P.<$$> P.empty
 
 -- | A generic single-line view of a thingy.
-renderThingyLine :: UTCTime -> Node -> Thingy -> P.Doc
-renderThingyLine now node Thingy{..} =
-    let color = if Map.member Wait _flags then P.green else id
-    in color (renderContent _content)
+renderThingyLine :: UTCTime -> Relation -> Node -> Thingy -> P.Doc
+renderThingyLine now rel node Thingy{..} =
+    let color
+            | Map.member Wait _flags = P.green
+            | otherwise = id
+        header
+            | rel == ""       = P.dullblue
+            | rel == relGroup = P.dullyellow
+            | rel == relChild = (P.red "*" P.<+>)
+            | rel == relLink  = P.dullmagenta . (">" P.<+>)
+            | otherwise       = (P.blue (P.text rel) P.<+>) . P.yellow
+
+    in header $ color (renderContent _content)
         P.<+> renderNode node
-        P.<+> (if Map.null _flags then id else (P.tupled (map render $ Map.keys _flags) P.<+>))
+        P.<+> (if Map.null _flags
+                  then id
+                  else (P.tupled (map render $ Map.keys _flags) P.<+>))
             (render (now, _created))
 
 -- | Like @renderThingyLine@, but for a flat rendering.
@@ -103,26 +115,20 @@ renderNodesFlat now = P.vcat . map (uncurry $ renderThingyLineFlat now Nothing)
 
 renderViewRoot :: UTCTime -> Tree (Relation, Context') -> P.Doc
 renderViewRoot now (Node (_, ctx) sub) =
-  P.hang 2 $ P.dullblue (renderThingyLine now (node' ctx) (lab' ctx))
+  P.dullblue (renderThingyLine now "" (node' ctx) (lab' ctx))
       P.<$$> renderViewForest now sub
 
 renderViewForest :: UTCTime -> Forest (Relation, Context') -> P.Doc
 renderViewForest now = P.vcat . map (\(Node (rel, ctx) sub) ->
-  let header = if | rel == relGroup -> P.yellow
-                  | rel == relChild -> (P.red "*" P.<+>)
-                  | rel == relLink  -> P.dullmagenta
-                  | otherwise       -> (P.red (P.text rel) P.<+>)
-
-  in -- (if rel == relGroup then (P.empty P.<$$>) else id) $
       P.hang 2 $ if null sub
-          then header (renderThingyLine now (node' ctx) (lab' ctx))
-          else header (renderThingyLine now (node' ctx) (lab' ctx))
+          then renderThingyLine now rel (node' ctx) (lab' ctx)
+          else renderThingyLine now rel (node' ctx) (lab' ctx)
                   P.<$$> renderViewForest now sub
   )
 
 renderContent :: String -> P.Doc
 renderContent cnt =
-  let rticket = Regex.makeRegex ("(#[0-9]*)" :: String) :: Regex.Regex
+  let rticket = Regex.makeRegex ("(#[^-# ]*)" :: String) :: Regex.Regex
   in case Regex.getAllSubmatches $ Regex.match rticket cnt of
       [_,(start,len)]
           | (s1, s2) <- splitAt start cnt -> P.text s1 P.<> P.dullcyan (P.text (take len s2)) P.<> P.text (drop len s2)
