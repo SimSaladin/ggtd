@@ -40,6 +40,7 @@ instance Renderable Tickler where
     render (TMonth month)         = P.text "Beginning of" P.<+> P.dullblue (P.text (formatMonth month))
     render (TYear year)           = P.text "Year" P.<+> P.dullgreen (P.text (show year))
     render (TDay day)             = P.dullgreen (P.text (formatTime defaultTimeLocale "%F" day))
+    render TMonthly               = P.dullblue "Every month"
 
 instance Renderable TicklerAction where
     render (TSetFlag flag Nothing)   = P.text "unset flag" P.<+> render flag
@@ -106,7 +107,7 @@ renderViewForest now = P.vcat . map (\(Node (rel, ctx) sub) ->
                   | rel == relLink  -> P.dullmagenta
                   | otherwise       -> (P.red (P.text rel) P.<+>)
 
-  in (if rel == relGroup then (P.empty P.<$$>) else id) $
+  in -- (if rel == relGroup then (P.empty P.<$$>) else id) $
       P.hang 2 $ if null sub
           then header (renderThingyLine now (node' ctx) (lab' ctx))
           else header (renderThingyLine now (node' ctx) (lab' ctx))
@@ -152,12 +153,22 @@ printTreeAt fltr srt node = do
 printChildren :: [Filter] -> Sort -> Node -> Handler ()
 printChildren fltrs srts nd = printTreeAt fltrs srts nd
 
-printChildrenFlat :: [Filter] -> Sort -> Node -> Handler ()
-printChildrenFlat fltr srt node = do
+-- | Flattens the tree before printing.
+printChildrenFlat
+    :: [Filter] -- ^ Filter (at forests)
+    -> Sort -- ^ Sort (at forest)
+    -> Sort -- ^ Sort (at the flat list)
+    -> Node
+    -> Handler ()
+printChildrenFlat fltr srt srt' node = do
     now <- liftIO getCurrentTime
     (forest, _) <- getViewAtGr fltr srt node
-    let actionable = filter isActionable $ concatMap flatten forest
-    pp $ P.vcat $ map (\(_, ctx) -> renderThingyLineFlat now (node' ctx) (lab' ctx)) actionable
+
+    let flat = concatMap flatten forest
+        thingies = applySort srt' $ filter isActionable flat
+        totext (_, ctx) = renderThingyLineFlat now (node' ctx) (lab' ctx)
+
+    pp $ P.vcat $ map totext thingies
 
 -- | Actually context
 printNode :: Node -> Handler ()

@@ -18,6 +18,7 @@ import GGTD.DB.Update
 
 import Control.Concurrent
 import Control.Monad
+import Control.Monad.IO.Class
 import Control.Lens
 import qualified Data.Map as Map
 import Data.Maybe (mapMaybe)
@@ -26,6 +27,7 @@ import Data.Time.LocalTime
 import Data.Time.Calendar
 import Data.Time.Calendar.OrdinalDate (toOrdinalDate, mondayStartWeek)
 import Data.Time.Calendar.MonthDay (dayOfYearToMonthAndDay)
+import Data.Time.Calendar.WeekDate (toWeekDate, fromWeekDate)
 
 -- * Types
 
@@ -36,6 +38,7 @@ type DayOfWeek = Int
 
 data Tickler = TDayOfWeek DayOfWeek -- ^ Every given day of week
              | TMonth Month -- ^ Beginning of the month
+             | TMonthly -- ^ Beginning of any month
              | TYear Year -- ^ Beginning of a year
              | TDay Day -- ^ A specific day
              deriving (Show, Read, Eq)
@@ -50,10 +53,10 @@ forkTicklerWorker :: IO ThreadId
 forkTicklerWorker = forkIO $ forever goTickle
   where
     goTickle = do
+        prev    <- runHandler $ use ticklerLast
         current <- getZonedTime <&> localDay . zonedTimeToLocalTime
-        begin   <- runHandler $ use ticklerLast <&> addDays 1
-        if begin < current
-            then runHandler $ runTicklers (addDays 1 begin) current
+        if prev < current
+            then runHandler $ runTicklers (addDays 1 prev) current
             else threadDelay duration
     
     duration = 1 * 60 * 60 * 1000000 -- one hour
@@ -98,6 +101,7 @@ runTicklers start end = do
     matches (TMonth month)   = month `elem` triggeredMonths
     matches (TYear year)     = fromIntegral year `elem` triggeredYears
     matches (TDay day)       = start <= day && day <= end
+    matches TMonthly         = not $ null triggeredMonths
 
     triggeredWeekDays = map (snd . mondayStartWeek) $ take 7 [start .. end]
     triggeredMonths   = take 12 $ map snd triggeredMonthsYears
@@ -106,10 +110,36 @@ runTicklers start end = do
     triggeredMonthsYears =
         [ (year, month)
             | day <- [start .. end]
-            , (year, yearDay) <- [ toOrdinalDate day ]
-            , (month, 1) <- return $ dayOfYearToMonthAndDay (isLeapYear year) yearDay
+            , let (year, yearDay) = toOrdinalDate day
+            , (month, 1) <- [dayOfYearToMonthAndDay (isLeapYear year) yearDay]
         ]
 
 runTicklerAction :: Node -> TicklerAction -> Handler ()
 runTicklerAction node (TSetFlag flag mcontent) =
     overNode node $ _3.flags %~ Map.alter (const mcontent) flag
+
+-- * Time utilities
+
+-- | Set the time to Monday 0:00 of the running week.
+toStartOfWeek :: LocalTime -> LocalTime
+toStartOfWeek LocalTime{..} =
+    let (y, w, _) = toWeekDate localDay
+    in LocalTime { localDay = fromWeekDate y w 1, localTimeOfDay = midnight }
+
+toStartOfMonth :: LocalTime -> LocalTime
+toStartOfMonth LocalTime{..} =
+    let (y, m, _) = toGregorian localDay
+    in LocalTime { localDay = fromGregorian y m 1, localTimeOfDay = midnight }
+
+addWeeks :: Integer -> LocalTime -> LocalTime
+addWeeks n time = time { localDay = addDays (7 * n) (localDay time) }
+
+-- | Clips to the end of month if necessary.
+addMonths :: Integer -> LocalTime -> LocalTime
+addMonths n time = time { localDay = addGregorianMonthsClip n (localDay time) }
+
+getMonth :: LocalTime -> Month
+getMonth = view _2 . toGregorian . localDay
+
+getLocalTime :: MonadIO m => m LocalTime
+getLocalTime = liftIO $ getZonedTime <&> zonedTimeToLocalTime

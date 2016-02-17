@@ -40,11 +40,13 @@ ticklerAction =
 ticklerAddAction :: Action IO
 ticklerAddAction =
     withNonOption nodeType $ \nodeP ->
-    withNonOption ticklerType $ \tickler ->
+    withNonOption ticklerType $ \toTickler ->
     withNonOption flagType $ \flag ->
     handler $ fromNodeP nodeP >>= \case
         Nothing -> return ()
-        Just node -> attachTickler tickler (TSetFlag flag Nothing) node
+        Just node -> do
+            time <- getLocalTime
+            attachTickler (toTickler time) (TSetFlag flag Nothing) node
 
 -- | Remove ALL ticklers associated with a node
 --

@@ -33,7 +33,8 @@ type Sort = [SortAtom]
 
 defaultSort :: Sort
 defaultSort =
-    [ sortLastRel relLink
+    [ sortLastRel relLink -- Links go always last
+    , sortLastRel relGroup -- Then we have groups almost at the bottom
     , SDesc (SFlag Wait)
     , SFlag Priority
     , SCreated

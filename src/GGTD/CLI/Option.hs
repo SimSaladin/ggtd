@@ -19,6 +19,7 @@ import           Control.Lens
 import           Control.Monad.IO.Class
 import           Data.Graph.Inductive.Graph
 import qualified Data.List as L
+import           Data.Time
 import           System.Console.Argument (Option, option, Type(..))
 import qualified System.Console.Argument as Arg
 import           System.Console.Command
@@ -71,12 +72,21 @@ relType = Arg.string { Arg.name = "REL" }
 contentType :: Arg.Type String
 contentType = Arg.string { Arg.name = "CONTENT" }
 
---   * every [ma|ti|ke|to|pe|la] <[until DD.MM]>
---   * (others?)
-ticklerType :: Arg.Type Tickler
+-- |
+--   * nextmonth
+--   * daily[:ma|ti|ke|to|pe|la|su]
+--   * monthly
+ticklerType :: Arg.Type (LocalTime -> Tickler)
 ticklerType = Arg.Type parse "TICKLER" Nothing
   where
-    parse str = maybe (Left "Invalid tickler") Right $ L.lookup str days
+    parse "nextmonth" = Right $ TMonth . getMonth . addMonths 1
+    parse "monthly"   = Right $ const TMonthly
+    -- parse "nextweek"  = Right $ \t -> _ -- not implemented in GGTD.Tickler
+    parse inp
+        | Just str <- L.stripPrefix "daily:" inp
+        = maybe (Left "Invalid tickler") (Right . const)
+                (L.lookup str days :: Maybe Tickler)
+        | otherwise = Left "Invalid tickler"
 
     days = zip ["ma", "ti", "ke", "to", "pe", "la", "su"] (map TDayOfWeek [1..7])
 

@@ -34,6 +34,14 @@ Remove all relation from a node to a node:
 
     rel delete @home chores
 
+## Tickler syntax
+
+    tickler add "somenode" monthly done
+    tickler add "somenode" nextmonth wait
+    tickler add "somenode" daily:ke wait
+
+The last argument indicates which flag to unset.
+
 ## Nice-to-have-things
 
 - Integration possibilities with things like github issues
@@ -45,4 +53,3 @@ Remove all relation from a node to a node:
     node from a tracking node
 - Sorting by relevance
 - Default connect new childs to some node that is used to track incoming things
-- Find function

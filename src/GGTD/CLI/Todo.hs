@@ -33,5 +33,6 @@ todoAction =
             node <- if nodeS == -1 then use viewContext else return nodeS
             let flt = FNotContent "someday/maybe" : flt_opt
                 srt = sortFirstRel "child" : srt_opt
-            printChildrenFlat flt srt node
+                srtFlat = [SDesc $ SFlag Wait]
+            printChildrenFlat flt srt srtFlat node
 

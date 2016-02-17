@@ -62,5 +62,3 @@ commands = Node
     , Node (command "quit" "Quit the application" $ io $ exitSuccess) []
     , Node (command "help" "Show help" $ io $ showUsage commands) []
     ]
-
-
