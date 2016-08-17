@@ -28,6 +28,7 @@ library
                      , GGTD.DB
                      , GGTD.DB.Query
                      , GGTD.DB.Update
+                     , GGTD.TUI
                      , GGTD.Filter
                      , GGTD.Relation
                      , GGTD.Sort
@@ -48,6 +49,7 @@ library
                      , regex-compat    >= 0.90    && < 1
                      , friendly-time   >= 0.4     && < 1
                      , yaml            >= 0.8.4   && < 1
+                     , vty             >= 5.5.0   && < 6
   ghc-options:         -Wall -Werror -O
   default-extensions:  OverloadedStrings
                        RecordWildCards
@@ -63,4 +65,4 @@ executable ggtd
                      , base >= 4.7 && < 5
                      , transformers
                      , console-program
-  ghc-options:         -Wall -Werror -O
+  ghc-options:         -Wall -Werror -threaded -O

@@ -125,5 +125,3 @@ instance ToJSON (Map Flag String) where
     toJSON = toJSON . Map.mapKeys show
 instance FromJSON (Map Flag String) where
     parseJSON = fmap (Map.mapKeys read) . parseJSON
-instance ToJSON Day where toJSON = toJSON . fromEnum
-instance FromJSON Day where parseJSON = fmap toEnum . parseJSON

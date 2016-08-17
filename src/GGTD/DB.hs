@@ -23,6 +23,7 @@ import System.Directory
 import System.Exit
 import System.IO.Unsafe (unsafePerformIO)
 
+-- | NB. we use this *global* database extensively!
 dbVar :: TMVar DB
 dbVar = unsafePerformIO newEmptyTMVarIO
 
