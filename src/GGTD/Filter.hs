@@ -20,6 +20,7 @@ data Filter = FFlag Flag
             | FNotFlag Flag
             | FNotContent String
             | FNone
+            | FRel Relation
             | FNotRel Relation
 
 -- | For this autogeneration to be sensible, every Flag constructor must
@@ -57,3 +58,4 @@ applyFilters fltrs (rel, (_,_,thingy,_)) = all applyFilter fltrs
     applyFilter (FFlag flg) = Map.member flg (_flags thingy)
     applyFilter (FNotContent str) = _content thingy /= str
     applyFilter (FNotRel r) = r /= rel
+    applyFilter (FRel r) = r == rel

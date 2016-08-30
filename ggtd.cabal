@@ -29,6 +29,8 @@ library
                      , GGTD.DB.Query
                      , GGTD.DB.Update
                      , GGTD.TUI
+                     , GGTD.TUI.Base
+                     , GGTD.TUI.TaskList
                      , GGTD.Filter
                      , GGTD.Relation
                      , GGTD.Sort
@@ -50,6 +52,8 @@ library
                      , friendly-time   >= 0.4     && < 1
                      , yaml            >= 0.8.4   && < 1
                      , vty             >= 5.5.0   && < 6
+                     , brick           >= 0.4     && < 0.5
+                     , data-default
   ghc-options:         -Wall -Werror -O
   default-extensions:  OverloadedStrings
                        RecordWildCards
