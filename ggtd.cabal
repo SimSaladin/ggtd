@@ -31,6 +31,8 @@ library
                      , GGTD.TUI
                      , GGTD.TUI.Base
                      , GGTD.TUI.TaskList
+                     , GGTD.TUI.TreeNav
+                     , GGTD.TUI.LineInput
                      , GGTD.Filter
                      , GGTD.Relation
                      , GGTD.Sort
