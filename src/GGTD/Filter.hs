@@ -22,6 +22,7 @@ data Filter = FFlag Flag
             | FNone
             | FRel Relation
             | FNotRel Relation
+            | FAny [Filter]
 
 -- | For this autogeneration to be sensible, every Flag constructor must
 -- have unique first character.
@@ -59,3 +60,4 @@ applyFilters fltrs (rel, (_,_,thingy,_)) = all applyFilter fltrs
     applyFilter (FNotContent str) = _content thingy /= str
     applyFilter (FNotRel r) = r /= rel
     applyFilter (FRel r) = r == rel
+    applyFilter (FAny xs) = any applyFilter xs

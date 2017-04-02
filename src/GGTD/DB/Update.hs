@@ -18,7 +18,7 @@ import           Data.Time (getCurrentTime)
 import qualified Data.Map as Map
 
 
--- * Modify
+-- * Create nodes
 
 createThingy :: MonadIO m => String -> m Thingy
 createThingy txt = Thingy <$> liftIO getCurrentTime <*> pure txt <*> pure Map.empty
@@ -30,18 +30,27 @@ addThingyGr thingy = do
     gr %= insNode (nxt, thingy)
     return nxt
 
+-- * Create relations
+
+-- | @addRelGr (parent, child, rel)@ creates the given relation.
 addRelGr :: (Node, Node, Relation) -> Handler ()
 addRelGr edge = gr %= insEdge edge
 
+-- | Replaces all parent links with a link from given node.
+setParentGr :: Node -> Node -> Handler ()
+setParentGr node parent = overNode node (ctxParents.each.adjNode .~ parent)
+
+delRelGr :: (Node, Node) -> Handler ()
+delRelGr edge = gr %= delEdge edge
+
+-- * Modify nodes
+
 alterFlagGr :: Node -> Flag -> Maybe String -> Handler ()
 alterFlagGr node flag val = overNode node $
-    _3.flags %~ Map.alter (const val) flag
+    ctxLab.flags %~ Map.alter (const val) flag
 
 updateContentGr :: Node -> String -> Handler ()
-updateContentGr node cnt = overNode node (_3.content .~ cnt)
-
-setParentGr :: Node -> Node -> Handler ()
-setParentGr node parent = overNode node (_1.each._2 .~ parent)
+updateContentGr node cnt = overNode node (ctxLab.content .~ cnt)
 
 -- | Combinator used by graph modifying code.
 overNode :: Node -> (Context' -> Context') -> Handler ()
@@ -49,6 +58,8 @@ overNode node f = use gr >>= go
   where
     go g | (Just ctx, g') <- match node g = gr .= (f ctx & g')
          | otherwise                      = nodeNotFound
+
+-- * Delete nodes
 
 deleteNodeGr :: Node -> Handler ()
 deleteNodeGr node = gr %= delNode node

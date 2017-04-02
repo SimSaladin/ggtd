@@ -65,3 +65,12 @@ findNodes :: String -> Handler [LNode Thingy]
 findNodes str = use gr <&> filter f . labNodes
   where
     f (_, th) = str `L.isInfixOf` _content th
+
+-- | if there's exactly one node that's an exact match, return only that
+findNodesHeuristic :: String -> Handler [LNode Thingy]
+findNodesHeuristic str = guess <$> findNodes str
+ where
+    guess []  = []
+    guess [x] = [x]
+    guess xs | [res] <- filter ( (== str) . _content . snd ) xs = [res]
+             | otherwise = xs

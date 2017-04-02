@@ -10,6 +10,11 @@
 
 ## Usage
 
+Two modes: basic commandline and curses
+
+    ggtd    # basic interface
+    ggtd b  # curses interface
+
 New task
 
     node "Do the laundry"

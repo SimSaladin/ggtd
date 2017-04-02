@@ -24,9 +24,9 @@ import           Data.Graph.Inductive.Query.DFS (CFun)
 import           Data.Graph.Inductive.PatriciaTree
 import           Data.Time
 import           Data.Map (Map)
-import qualified Data.Map as Map
+import qualified Data.Text as T
 import           GHC.Generics (Generic)
-import           Data.Yaml (ToJSON(..), FromJSON(..))
+import           Data.Aeson.Types -- (ToJSONKey(..), toJSONKeyText)
 
 -- | Use Handlers to make modificationss to the DB.
 type Handler = StateT DB IO
@@ -66,14 +66,21 @@ makeLenses ''DB
 
 -- ** Lenses for graph manipulation
 
-preadj, sucadj :: Lens' (Context a b) (Adj b)
-preadj = _1
-sucadj = _4
+ctxParents, ctxChildren :: Lens' (Context a b) (Adj b)
+ctxParents = _1
+ctxChildren = _4
 
-adjnode :: Lens' (b, Node) Node
-adjnode = _2
-adjlab :: Lens' (b, Node) b
-adjlab  = _1
+ctxNode :: Lens' (Context a b) Node
+ctxNode = _2
+
+ctxLab :: Lens' (Context a b) a
+ctxLab = _3
+
+adjNode :: Lens' (b, Node) Node
+adjNode = _2
+
+adjLab :: Lens' (b, Node) b
+adjLab  = _1
 
 -- * Graph algorithms
 
@@ -121,7 +128,8 @@ instance FromJSON Flag
 instance ToJSON Thingy
 instance FromJSON Thingy
 
-instance ToJSON (Map Flag String) where
-    toJSON = toJSON . Map.mapKeys show
-instance FromJSON (Map Flag String) where
-    parseJSON = fmap (Map.mapKeys read) . parseJSON
+instance ToJSONKey Flag where
+    toJSONKey = toJSONKeyText (T.pack . show)
+
+instance FromJSONKey Flag where
+    fromJSONKey = FromJSONKeyText (read . T.unpack)

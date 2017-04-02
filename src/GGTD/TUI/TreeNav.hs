@@ -9,9 +9,10 @@
 ------------------------------------------------------------------------------
 module GGTD.TUI.TreeNav where
 
-import           GGTD.TUI.Base
+import           GGTD.TUI.Base hiding (update)
 import qualified GGTD.TUI.TaskList as TaskList -- for thingy view
 import qualified GGTD.DB.Query as Q
+import qualified GGTD.DB.Update as U
 
 import           Data.Tree as Tree
 
@@ -23,10 +24,20 @@ new node = -- TODO: partial: head
     Q.tagging (True, True) tag . head . fst <$> Q.getViewAtGr fltr [] node
   where
   tag  = const (False, False)
-  fltr = [ FRel relGroup ]
+  fltr = [ FAny [ FRel relGroup, FRel relLink ] ]
+
+update :: Node -> TreeNav -> Handler TreeNav
+update node old = do
+    tnav <- combine <$> new node <*> pure old
+    -- focus something if nothing is focused
+    case findFocusedNode tnav of
+        Nothing -> return $ setfocus tnav
+        _ -> return tnav
 
 up, down :: TreeNav -> (Node, TreeNav)
-up root = (findFocusedNode root', root')
+up root = case findFocusedNode root' of
+              Just focus -> (focus^._2, root')
+              Nothing -> (0, root') -- TODO hard-coded default
   where
     (_, root') = go root
     go :: TreeNav -> (Bool, TreeNav) -- (overflow to parent?, new tree)
@@ -39,7 +50,12 @@ up root = (findFocusedNode root', root')
                       Nothing -> (False, Node (x, (expanded, focus)) xs')  -- no overflow
                       Just 0  -> (False, Node (x, (expanded, True)) $ ix 0 %~ defocus $ xs') -- focus moves to parent (this)
                       Just i  -> (False, Node (x, (expanded, focus)) $ ix (i-1) %~ setfocuslast $ ix i %~ defocus $ xs') -- focus moves up by one
-down root = if newfocus < 0 then (findFocusedNode root, root) else (newfocus, root')
+
+down root = case newfocus of
+                Just focus -> (focus^._2, root')
+                Nothing    -> case findFocusedNode root of
+                                  Just focus -> (focus^._2, root)
+                                  Nothing    -> (0, root) -- TODO hard-coded default
   where
     (_, root') = go root
     newfocus   = findFocusedNode root'
@@ -55,8 +71,23 @@ down root = if newfocus < 0 then (findFocusedNode root, root) else (newfocus, ro
                         | i+1 < length xs' -> (False, Node (x, (expanded, focus)) $ ix (i+1) %~ setfocus $ ix i %~ defocus $ xs') -- focus moves up by one
                         | otherwise -> (True, Node (x, (expanded, focus)) xs') -- focus moves down to next group
 
-findFocusedNode :: TreeNav -> Node
-findFocusedNode = foldl (\n ((_,ctx), (_, focus)) -> if focus then node' ctx else n) (-1)
+findFocusedNode :: TreeNav -> Maybe (Relation, Node, Thingy)
+findFocusedNode = foldl -- note: doesn't use the tree structure
+    (\this ((rel, ctx), (_, focus)) ->
+        if focus then Just (rel, node' ctx, lab' ctx)
+                 else this
+    ) Nothing
+
+findFocusedParentNode :: TreeNav -> Node
+findFocusedParentNode (Node this subs) = case go (node' $ snd $ fst this) subs of
+                                             Nothing -> (node' $ snd $ fst this)
+                                             Just n  -> n
+    where
+    go    _     [] = Nothing
+    go curp (x:xs)
+        | Node ((_,ctx), (_, focus)) xs' <- x
+        = if focus then Just curp
+                   else go curp xs `mplus` go (node' ctx) xs'
 
 isFocused :: TreeNav -> Bool
 isFocused (Node (_, (_,f)) _) = f
@@ -77,6 +108,14 @@ toggleExpand :: TreeNav -> TreeNav
 toggleExpand = fmap go where
     go r@(x, (e, f)) | f         = (x, (not e, f))
                      | otherwise = r
+
+deleteFocused :: TreeNav -> Handler TreeNav
+deleteFocused tn = do
+    case findFocusedNode tn of
+        Nothing -> return ()
+        Just (_,node,_) -> U.deleteNodeGr node
+    update 0 tn
+    -- TODO hard-coded root
 
 -- * rendering
 
@@ -101,3 +140,19 @@ toImage (Node ((rel, ctx), (expanded, focused)) xs)
 
 viewThingyNonImportant :: Thingy -> Image
 viewThingyNonImportant thingy = string (defAttr `withForeColor` brightGreen) (thingy^.content)
+
+-- * other
+
+-- | @combine new old@ preserves structure and content from new, while
+-- restoring tags from old.
+combine :: TreeNav -> TreeNav -> TreeNav 
+combine tnew@(Node (nthis, _tags) nsub)
+             (Node (othis, otags) osub)
+    | takeNodeTree nthis == takeNodeTree othis = Node (nthis, otags) (combineF nsub osub)
+    | otherwise                                = tnew
+ where
+    takeNodeTree = node' . snd
+
+    combineF []      _     = []
+    combineF nforest []    = nforest
+    combineF (n:ns) (o:os) = combine n o : combineF ns os

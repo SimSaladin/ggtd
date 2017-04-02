@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE NamedFieldPuns #-}
 ------------------------------------------------------------------------------
 -- |
 -- Module         : GGTD.TUI.TaskList
@@ -22,12 +23,13 @@ import qualified Brick.Widgets.Edit as Edit
 import qualified Data.Tree as Tree
 
 data TaskList = TaskList
-              { tl :: ([(Relation, Node, Thingy)], [(Relation, Node, Thingy)]) -- ^ (before, at : after) focus
-              , editor :: Maybe (Editor, Maybe Node)
+              { root   :: Node
+              , tl     :: ([(Relation, Node, Thingy)], [(Relation, Node, Thingy)]) -- ^ (before, at : after) focus
+              , editor :: Maybe (Editor String Text, Maybe Node) -- ^ Maybe the node to be edited
               }
 
-view :: TaskList -> Widget
-view TaskList{..} = raw (viewtl tl) <=> maybe emptyWidget (Edit.renderEditor . fst) editor
+view :: TaskList -> Widget Text
+view TaskList{..} = raw (viewtl tl) <=> maybe emptyWidget (Edit.renderEditor True . fst) editor
         where
     viewtl (before, []) = vertCat (map (viewThingyTask False) before)
     viewtl (before, atFocus : after)
@@ -41,7 +43,7 @@ view TaskList{..} = raw (viewtl tl) <=> maybe emptyWidget (Edit.renderEditor . f
 up, down :: TaskList -> TaskList
 (up, down) = (helper up', helper down')
     where
-        helper f TaskList{..} = TaskList { tl = f tl, editor = editor }
+        helper f TaskList{..} = TaskList { root = root, tl = f tl, editor = editor }
 
         up'   ([], after) = ([], after)
         up'   (before, after) = (init before, last before : after)
@@ -59,8 +61,8 @@ focusNode n taskList = taskList { tl = scroll [] (before ++ after) }
 
 -- | Build task list recursively from given node.
 new :: Node -> Handler TaskList
-new node = do
-    ( [ Tree.Node _ xs ], _) <- Q.getViewAtGr [FNotRel relGroup] [SDesc (SFlag Done), SRelation linkLast] node
+new root = do
+    ( [ Tree.Node _ xs ], _) <- Q.getViewAtGr [FNotRel relGroup] [SDesc (SFlag Done), SRelation linkLast] root
     let tl     = ([], [ (rel, n, thingy) | (Tree.Node (rel, (_,n,thingy,_)) _) <- xs ])
         editor = Nothing
     return TaskList{..}
@@ -76,6 +78,8 @@ deleteFocused taskList@TaskList{..} = case tl of
         U.deleteNodeGr  n
         return taskList { tl = (xs, ys) }
     _ -> return taskList
+
+-- * content editing
 
 editFocused :: TaskList -> Handler TaskList
 editFocused taskList@TaskList{..} = case tl of
@@ -106,12 +110,27 @@ submitEditor parent taskList = do
             U.updateContentGr target contents
     focusNode curn <$> new parent
 
-handleBasicEditorKey :: Key -> [Modifier] -> TaskList -> EventM TaskList
+handleBasicEditorKey :: Key -> [Modifier] -> TaskList -> EventM Text TaskList
 handleBasicEditorKey key mods taskList
+
     | Just (edit, mt) <- editor taskList = do
-        edit' <- handleEvent (EvKey key mods) edit
+        edit' <- handleEventLensed edit id Edit.handleEditorEvent (EvKey key mods)
         return taskList { editor = Just (edit', mt) }
+
     | otherwise = return taskList
+
+-- * focus
+
+-- | Modify the focused node. Recalculate list afterwards.
+withFocused :: (Node -> Handler ()) -> TaskList -> Handler TaskList
+withFocused f taskList@TaskList{..} = case tl of
+    (_, (_, node, _) : _) -> f node >> fmap (focusNode node) (new root)
+    _ -> return taskList
+
+-- | Currently focused node (if any).
+askFocused :: TaskList -> Maybe (Relation, Node, Thingy)
+askFocused TaskList{tl} | (_, x : _) <- tl = Just x
+                        | otherwise        = Nothing
 
 -- * Utility
 
@@ -145,9 +164,9 @@ viewThingyFocused thingy = string (defAttr `withForeColor` blue) (thingy^.conten
 
 -- * Editors
 
-newNodeEditor :: Editor
+newNodeEditor :: Editor String Text
 newNodeEditor = contentsEditor ""
 
-contentsEditor :: String -> Editor
+contentsEditor :: String -> Editor String Text
 contentsEditor = Edit.editor "contents-editor" render (Just 1)
     where render = str . unlines

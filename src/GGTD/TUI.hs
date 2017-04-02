@@ -9,14 +9,10 @@
 ------------------------------------------------------------------------------
 module GGTD.TUI where
 
-import           Control.Monad
-import           Control.Lens hiding ((&), Context, Context')
-import           Control.Monad.IO.Class (liftIO)
-import           Data.Default
+-- import qualified GGTD.DB.Query as Q
+import qualified GGTD.DB.Update as U
 
-import           GGTD.Base
-import           GGTD.Relation
-import           GGTD.DB (runHandler)
+import           GGTD.TUI.Base
 import           GGTD.TUI.TaskList     (TaskList)
 import qualified GGTD.TUI.TaskList  as TaskList
 import           GGTD.TUI.TreeNav      (TreeNav)
@@ -24,42 +20,94 @@ import qualified GGTD.TUI.TreeNav   as TreeNav
 import           GGTD.TUI.LineInput    (LineInput)
 import qualified GGTD.TUI.LineInput as LineInput
 
-import           Brick
-import           Graphics.Vty
-
 data Model = Model
     { _curTaskList   :: TaskList
     , _urgentMatter  :: Maybe [String] -- notifications
     , _treeNav       :: TreeNav 
     , _curFocus      :: AppFocus
     , _lineInput     :: LineInput Model
+    , _statusLine    :: Text
     }
-
-data AppFocus = FocusTreeNav
-              | FocusTaskList
-              | FocusLineInput
 
 -- makeLenses
 makeLenses ''Model
 
-run :: Handler a -> EventM a
+run :: Handler a -> EventM Text a
 run = liftIO . runHandler
 
 -- | brick/vty-based UI for ggtd.
 terminalUI :: IO ()
-terminalUI = void $ defaultMain app =<< runHandler initialModel
+terminalUI = do
+    model <- runHandler initialModel
+    _ <- customMain (mkVty defaultConfig) (Just evchan) app model
+    return ()
 
-app :: App Model Event
+app :: App Model MyEvent Text
 app = App
     { appDraw         = draw
     , appChooseCursor = \_ xs -> case xs of
                                     (x:_) -> Just x
                                     _ -> Nothing
-    , appHandleEvent  = updateModel
+    , appHandleEvent  = flip updateModel
     , appStartEvent   = return
-    , appAttrMap      = def
-    , appLiftVtyEvent = id
+    , appAttrMap      = const $ attrMap defAttr []
     }
+
+-- KEYS
+
+myEventMap :: AppFocus -> BrickEvent n MyEvent -> Action
+myEventMap FocusTaskList  = \ev model -> handleKeyTaskList (model^.curTaskList) ev model
+myEventMap FocusTreeNav   = handleKeyTreeNav
+myEventMap FocusLineInput = handleKeyLineInput
+
+handleKeyTaskList :: TaskList -> BrickEvent n MyEvent -> Action
+handleKeyTaskList taskList (VtyEvent (EvKey key mods))
+    | Just _ <- TaskList.editor taskList = handleEditor
+    | otherwise                          = handleNormal
+    where
+    handleNormal :: Action
+    handleNormal = case (key, mods) of
+        (KChar 'd', []     ) -> withTaskList $ TaskList.withFocused (\n -> U.alterFlagGr n Done (Just "done"))
+        (KChar 'd', [MCtrl]) -> withTaskList TaskList.deleteFocused
+        (KChar 'e', []     ) -> withTaskList $ TaskList.editFocused
+        (KChar 'h', []     ) -> continue . (curFocus .~ FocusTreeNav)
+        (KChar 'j', []     ) -> withTaskList $ return . TaskList.down
+        (KChar 'k', []     ) -> withTaskList $ return . TaskList.up
+        (KChar 'n', []     ) -> withTaskList $ TaskList.openNewNodeEditor
+        _                    -> handleKeyGeneric key mods
+
+    handleEditor :: Action
+    handleEditor = case (key, mods) of
+        (KEsc  , []) -> withTaskList TaskList.exitEditor
+        (KEnter, []) -> withTreeNavFocusedNode $ \parent ->
+                withTaskList (TaskList.submitEditor parent)
+        _ -> \model -> do
+            tlist <- TaskList.handleBasicEditorKey key mods (model ^. curTaskList)
+            continue $ curTaskList .~ tlist $ model
+handleKeyTaskList _taskList _ = continue
+
+handleKeyTreeNav :: BrickEvent n MyEvent -> Action
+handleKeyTreeNav ev = case ev of
+    VtyEvent (EvKey (KChar 'k') []     ) -> focusUpTreeNav
+    VtyEvent (EvKey (KChar 'j') []     ) -> focusDownTreeNav
+    VtyEvent (EvKey (KChar 'l') []     ) -> continue . (curFocus .~ FocusTaskList)
+    VtyEvent (EvKey KEnter      []     ) -> continue . (treeNav %~ TreeNav.toggleExpand)
+    VtyEvent (EvKey (KChar 'n') []     ) -> groupAddTreeNav
+    VtyEvent (EvKey (KChar 'd') [MCtrl]) -> withTreeNav TreeNav.deleteFocused
+    VtyEvent (EvKey key       mods     ) -> handleKeyGeneric key mods
+    _ -> continue
+
+handleKeyLineInput :: BrickEvent n MyEvent -> Action
+handleKeyLineInput ev model' = handleEventLensed model' lineInput LineInput.handleLineInputEvent ev >>= continue
+
+-- | Core keys, available almost everywhere except an edit mode.
+handleKeyGeneric :: Key -> [Modifier] -> Action
+handleKeyGeneric key mods = case (key, mods) of
+    (KChar 'c', [MCtrl]) -> halt
+    (KChar 'q', [])      -> halt
+    (KChar 'c', [])      -> copyFocusedNode
+    (KChar 'm', [])      -> moveFocusedNode
+    _                    -> continue
 
 -- MODEL
 
@@ -70,14 +118,19 @@ initialModel = Model
     <*> TreeNav.new 0
     <*> pure FocusTreeNav
     <*> pure LineInput.inactive
+    <*> pure "ggtd"
 
 -- VIEW
 
-draw :: Model -> [Widget]
-draw Model{..} =
-    [ raw (pad 0 0 1 0 (
-        TreeNav.toImage _treeNav <-> viewUrgentMatter _urgentMatter ))
-      <+> TaskList.view _curTaskList <=> LineInput.renderLineInput _lineInput ]
+draw :: Model -> [Widget Text]
+draw Model{..} = return $
+    (tnav <+> tlist)
+    <=>
+    sline
+  where
+    tnav  = raw (pad 0 0 1 0 ( TreeNav.toImage _treeNav <-> viewUrgentMatter _urgentMatter ))
+    tlist = TaskList.view _curTaskList <=> LineInput.renderLineInput _lineInput
+    sline = padTop Max $ txt _statusLine
 
 viewUrgentMatter :: Maybe [String] -> Image
 viewUrgentMatter Nothing = mempty
@@ -85,67 +138,69 @@ viewUrgentMatter (Just xs) = vertCat [ string (defAttr `withForeColor` red) x | 
 
 -- UPDATE
 
-type Action = Model -> EventM (Next Model)
+type Action = Model -> EventM Text (Next Model)
 
-updateModel :: Model -> Event -> EventM (Next Model)
-updateModel model EvMouse{}           = continue model
-updateModel model EvResize{}          = continue model
-updateModel model ev@(EvKey key mods) = case model^.curFocus of
-    FocusTaskList  -> handleKeyTaskList (model^.curTaskList) key mods model
-    FocusTreeNav   -> handleKeyTreeNav  key mods model
-    FocusLineInput -> handleKeyLineInput ev model
+updateModel :: BrickEvent Text MyEvent -> Action
+updateModel ev@(VtyEvent{}) = \model -> myEventMap (model^.curFocus) ev model
 
-handleKeyTaskList :: TaskList -> Key -> [Modifier] -> Action
-handleKeyTaskList taskList key mods
-    | Just _ <- TaskList.editor taskList = handleTaskListEditorKey key mods
-    | otherwise = handleKeyTaskListNormal key mods
-    where
+updateModel (AppEvent (SetStatus newstatus)) = continue . (statusLine .~ newstatus)
+updateModel (AppEvent (UIError err))         = continue . (statusLine .~ err)
+updateModel (AppEvent (SetFocus foc))        = continue . (curFocus .~ foc)
+updateModel (AppEvent RefreshTaskList)       = refreshTaskList
+updateModel (AppEvent RefreshTreeNav)        = \model -> do
+    tnav <- run $ TreeNav.update 0 (model^.treeNav)
+    run $ emit RefreshTaskList
+    continue $ treeNav.~tnav $ model
+updateModel MouseUp{} = continue . id
+updateModel MouseDown{} = continue . id
 
-    handleKeyTaskListNormal :: Key -> [Modifier] -> Action
-    handleKeyTaskListNormal (KChar 'd') [MCtrl] = withTaskList TaskList.deleteFocused
-    handleKeyTaskListNormal (KChar 'k') [] = withTaskList $ return . TaskList.up
-    handleKeyTaskListNormal (KChar 'j') [] = withTaskList $ return . TaskList.down
-    handleKeyTaskListNormal (KChar 'n') [] = withTaskList $ TaskList.openNewNodeEditor
-    handleKeyTaskListNormal (KChar 'e') [] = withTaskList $ TaskList.editFocused
-    handleKeyTaskListNormal (KChar 'h') [] = continue . (curFocus .~ FocusTreeNav)
-    handleKeyTaskListNormal _ _ = handleKeyGeneric key mods
+-- * ACTION
 
-    handleTaskListEditorKey :: Key -> [Modifier] -> Action
-    handleTaskListEditorKey KEsc   [] = withTaskList TaskList.exitEditor
-    handleTaskListEditorKey KEnter [] = \model -> do
-        let parent = TreeNav.findFocusedNode (_treeNav model)
-        withTaskList (TaskList.submitEditor parent) model
+-- | Copy node to under asked parent node
+copyFocusedNode :: Action
+copyFocusedNode =
+    withFocused $ \(rel, focusedNode, _) ->
+    withChooseNode $ \parent -> U.addRelGr (parent,focusedNode,rel)
+                             >> emit RefreshTreeNav
 
-    handleTaskListEditorKey _ _ = \model -> do
-        tlist <- TaskList.handleBasicEditorKey key mods (model ^. curTaskList)
-        continue $ curTaskList .~ tlist $ model
+-- | Copy node to under asked parent node, remove from current focused
+-- parent.
+moveFocusedNode :: Action
+moveFocusedNode =
+    withFocused $ \(rel, focusedNode, _) ->
+    withFocusedParentNode $ \focusedParent ->
+    withChooseNode $ \parent -> do
+        U.addRelGr (parent, focusedNode, rel)
+        U.delRelGr (focusedParent, focusedNode)
+        emit $ SetStatus $ pack $ show (focusedParent, focusedNode)
+        emit RefreshTreeNav
 
-handleKeyTreeNav :: Key -> [Modifier] -> Action
-handleKeyTreeNav (KChar 'k') [] = focusUpTreeNav
-handleKeyTreeNav (KChar 'j') [] = focusDownTreeNav
-handleKeyTreeNav (KChar 'l') [] = continue . (curFocus .~ FocusTaskList)
-handleKeyTreeNav KEnter      [] = continue . (treeNav %~ TreeNav.toggleExpand)
-handleKeyTreeNav (KChar 'n') [] = groupAddTreeNav
-handleKeyTreeNav key       mods = handleKeyGeneric key mods
-
-handleKeyLineInput :: Event -> Action
-handleKeyLineInput ev model' = do
-    model <- handleEventLensed model' lineInput ev
-    if model ^. lineInput . LineInput.submitted
-        then refreshTreeNav $ curFocus .~ FocusTreeNav $ model
-        else continue model
-
--- | Core keys, available almost everywhere except an edit mode.
-handleKeyGeneric :: Key -> [Modifier] -> Action
-handleKeyGeneric (KChar 'c') [MCtrl] = halt
-handleKeyGeneric (KChar 'q') []      = halt
-handleKeyGeneric _           _       = continue
+refreshTaskList :: Action
+refreshTaskList = do
+    mparent <- view $ treeNav.to TreeNav.findFocusedNode
+    mfocus <- view $ curTaskList.to TaskList.askFocused
+    (\model -> do
+        tlist' <- run $ TaskList.new $ maybe 0 (^._2) mparent
+        let tlist = case mfocus of
+                        Just focus -> TaskList.focusNode (focus^._2) tlist'
+                        Nothing    -> tlist'
+        continue $ (curTaskList.~tlist) model
+     )
 
 -- * Generic
+
+-- | Ask for a node with an editor and perform an action with the node.
+withChooseNode :: (Node -> Handler ()) -> Action
+withChooseNode f = focusNewEditor $ LineInput.nodeChooser f
 
 withTaskList :: (TaskList -> Handler TaskList) -> Action
 withTaskList go model = do
     tlist <- run $ go (model ^. curTaskList)
+
+    run $ case TaskList.askFocused tlist of
+        Nothing -> return ()
+        Just x  -> emit $ SetStatus $ pack $ show x
+
     continue $ curTaskList .~ tlist $ model
 
 withTreeNav :: (TreeNav -> Handler TreeNav) -> Action
@@ -153,15 +208,63 @@ withTreeNav go model = do
     nav <- run $ go (model ^. treeNav)
     continue $ treeNav .~ nav $ model
 
-refreshTreeNav :: Action
-refreshTreeNav model = do
-    nav <- run $ TreeNav.new 0
-    continue $ treeNav .~ nav $ model
-
 groupAddTreeNav :: Action
-groupAddTreeNav model = do
-    let parent = model^.treeNav.to TreeNav.findFocusedNode
-    continue $ (curFocus .~ FocusLineInput) . (lineInput .~ LineInput.nodeAdd relGroup parent) $ model
+groupAddTreeNav = withTreeNavFocusedNode $ \parent ->
+    focusNewEditor (LineInput.nodeAdd relGroup parent)
+
+focusNewEditor :: LineInput Model -> Action
+focusNewEditor li' = do
+    foc <- view curFocus
+    let li = LineInput.addDestroyHandler li' (emit $ SetFocus foc)
+    continue . (curFocus .~ FocusLineInput) . (lineInput .~ li)
+
+-- * The focused node
+
+-- | The focused node is taken from the context we are focused at:
+-- * TreeNav focused node
+-- * TaskList focused node
+-- If no focused node can be found, an UIError is emitted
+withFocused :: ((Relation, Node, Thingy) -> Action) -> Action
+withFocused f = view curFocus >>= \case
+    FocusTaskList -> withTaskListFocused f
+    FocusTreeNav -> withTreeNavFocused f
+    _ -> do _ <- const $ run.emit $ UIError "Current focus doesn't specify a node"
+            continue
+
+-- ** Focused parent
+
+-- | Resolve the focused parent node for currently focused node.
+withFocusedParentNode :: (Node -> Action) -> Action
+withFocusedParentNode f = view curFocus >>= \case
+    FocusTaskList -> withTreeNavFocusedNode f
+    FocusTreeNav  -> view (treeNav . to TreeNav.findFocusedParentNode) >>= f
+    _ -> do _ <- const $ run.emit $ UIError "Current focus doesn't specify focus's parent"
+            continue
+
+-- ** per-context focus
+
+withTreeNavFocused :: ((Relation, Node, Thingy) -> Action) -> Action
+withTreeNavFocused f = do
+    mthis <- view $ treeNav . to TreeNav.findFocusedNode
+    case mthis of
+        Just this -> f this
+        Nothing   -> \m -> run (emit $ UIError "No treenav node focused") >> continue m
+
+withTaskListFocused :: ((Relation, Node, Thingy) -> Action) -> Action
+withTaskListFocused f = do
+    mthis <- view $ curTaskList.to (TaskList.askFocused)
+    case mthis of
+        Just this -> f this
+        Nothing   -> \m -> run (emit $ UIError "No tasklist node focused") >> continue m
+
+-- ** Node only
+
+withFocusedNode :: (Node -> Action) -> Action
+withFocusedNode f = withFocused $ \(_,n,_) -> f n
+withTreeNavFocusedNode :: (Node -> Action) -> Action
+withTreeNavFocusedNode f = withTreeNavFocused $ \(_,n,_) -> f n
+withTaskListFocusedNode :: (Node -> Action) -> Action
+withTaskListFocusedNode f = withTaskListFocused $ \(_,n,_) -> f n
 
 -- * TaskList
 

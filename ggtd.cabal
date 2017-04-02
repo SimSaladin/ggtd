@@ -12,6 +12,10 @@ category:            Application
 build-type:          Simple
 cabal-version:       >=1.10
 
+flag static
+  description: Compile a static binary
+  default:  False
+
 library
   hs-source-dirs:      src
   exposed-modules:     GGTD.Base
@@ -40,8 +44,10 @@ library
   default-language:    Haskell2010
   build-depends:       base            >= 4.7     && < 5
                      , time            >= 1.0     && < 2
+                     , aeson           >= 1.0     && < 1.1
                      , containers      >= 0.5     && < 1
-                     , transformers    >= 0.4     && < 0.5
+                     , transformers    >= 0.4     && < 0.6
+                     , text            >= 1.0     && < 2
                      , stm             >= 2.4     && < 3
                      , fgl             >= 5.0     && < 6
                      , lens            >= 4.0     && < 5.0
@@ -54,9 +60,9 @@ library
                      , friendly-time   >= 0.4     && < 1
                      , yaml            >= 0.8.4   && < 1
                      , vty             >= 5.5.0   && < 6
-                     , brick           >= 0.4     && < 0.5
+                     , brick           >= 0.4     && < 0.18
                      , data-default
-  ghc-options:         -Wall -Werror -O
+  ghc-options:         -Wall -Werror -O2
   default-extensions:  OverloadedStrings
                        RecordWildCards
                        TemplateHaskell
@@ -71,4 +77,6 @@ executable ggtd
                      , base >= 4.7 && < 5
                      , transformers
                      , console-program
-  ghc-options:         -Wall -Werror -threaded -O
+  ghc-options:         -Wall -Werror -threaded -O2
+  if flag(static)
+   ghc-options:        -optl-static -fPIC

@@ -30,7 +30,7 @@ edgeChangeAction =
     handler $ fromNodeP nodeP >>= \nodePM -> fromNodeP node'P >>= \node'PM -> case liftA2 (,) nodePM node'PM of
         Nothing -> return ()
         Just (nd, nd') ->
-            overNode nd $ sucadj.each.filtered ((== nd') . snd) .adjlab .~ rel
+            overNode nd $ ctxChildren.each.filtered ((== nd') . snd) .adjLab .~ rel
 
 edgeParentAction :: Action IO
 edgeParentAction =
